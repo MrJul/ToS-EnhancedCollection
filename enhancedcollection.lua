@@ -6,8 +6,24 @@ local function TrimWithEllipsis(value, maxLength)
 	end
 end
 
-local function CreateCollectionItemControl(collectionControl, controlName, collectionClass, width, height)
-		
+local function GetCollectionColor(hasCollection, isCompletedCollection)
+	if not hasCollection then
+		return "{#808080}";
+	elseif isCompletedCollection then
+		return "{#FFD700}";
+	else
+		return "{#FFFFFF}";
+	end
+end
+
+local function CreateCollectionItemControl(collectionControl, collectionClass, collection, etcObject, controlName, width, height)
+	
+	local currentCount, maxCount = GET_COLLECTION_COUNT(collectionClass.ClassID, collection);
+	local name = dictionary.ReplaceDicIDInCompStr(collectionClass.Name);
+	local isCompletedCollection = currentCount >= maxCount;
+	local isNewCollection = etcObject["CollectionRead_" .. collectionClass.ClassID] == 0;
+	local collectionColor = GetCollectionColor(collection ~= nil, isCompletedCollection);
+			
 	local itemControl = collectionControl:CreateOrGetControl("groupbox", controlName, 0, 0, width, height);
 	itemControl:SetGravity(ui.LEFT, ui.TOP);
 	itemControl:SetSkinName("");
@@ -19,31 +35,44 @@ local function CreateCollectionItemControl(collectionControl, controlName, colle
 	buttonControl:EnableHitTest(1);
 	buttonControl:SetOverSound('button_over');
 
+	local imageSize = 28;
+	local imageMarginLeft = 8;
+	local imageMarginRight = 2;
+	local left = imageMarginLeft;
+
+	local completionControl = tolua.cast(buttonControl:CreateOrGetControl("picture", "completion", left, 0, imageSize, imageSize), "ui::CPicture");
+	completionControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
+	completionControl:EnableHitTest(0);
+	completionControl:SetEnableStretch(1);
+	if isCompletedCollection then
+		completionControl:SetImage("collection_com");
+	elseif isNewCollection then
+		completionControl:SetImage("collection_new");
+	end
+	left = left + imageSize + imageMarginRight;
+
 	local countControlWidth = 90;
 	local textMargin = 10;
-
-	local name = dictionary.ReplaceDicIDInCompStr(collectionClass.Name);
-		local nameControl = buttonControl:CreateOrGetControl("richtext", "name", textMargin, 0, width - countControlWidth - textMargin * 3, height);
+	local nameWidth = width - left - countControlWidth - textMargin * 2;
+	local nameControl = buttonControl:CreateOrGetControl("richtext", "name", left, 0, nameWidth, height);
 	nameControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
 	nameControl:EnableHitTest(0);
-	nameControl:SetText("{ol}{ds}" .. TrimWithEllipsis(name, 50));
-
-	--local file, err = io.open( '../addons/debug.txt', 'w' );
-	--file:write(collectionClass.Name .. '\n');
-	--for i = 1, 32 do
-	--	file:write(string.byte(collectionClass.Name, i) .. '\n');
-	--end
-	--for key,value in pairs(getmetatable(collectionClass)) do
---		file:write( key .. '\n' );
-	--end
-	--file:close();
-
-	local countControl = buttonControl:CreateOrGetControl("richtext", "count", width - countControlWidth - textMargin * 2, 0, countControlWidth, height);
+	nameControl:SetText("{ol}{ds}" .. collectionColor .. TrimWithEllipsis(name, 50));
+	left = left + nameWidth;
+		
+	local countControl = buttonControl:CreateOrGetControl("richtext", "count", left, 0, countControlWidth, height);
 	countControl:SetMargin(textMargin, 0, textMargin, 0);
 	countControl:SetGravity(ui.RIGHT, ui.CENTER_VERT);
 	countControl:EnableHitTest(0);
-	countControl:SetText("{ol}{ds}" .. " 2 (+1) / 6");
+	countControl:SetText("{ol}" .. collectionColor .. " " .. currentCount .. " / " .. maxCount);
+
 	
+
+	--local file, err = io.open( '../addons/debug.txt', 'w' );
+	--for key,value in pairs(getmetatable(completionControl)) do
+	--	file:write( key .. '\n' );
+	--end
+	--file:close();
 
 end
 
@@ -73,19 +102,14 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
 	collectionControl:EnableHitTest(1);
 
-	--local pc = session.GetMySession();
-	--local collections, collectionCount = pc:GetCollection();
-
-	local collectionList, collectionCount = GetClassList("Collection");
-
-	--local x = collectionControl:CreateOrGetControl("groupbox", "DECKEX_" .. 0, 0, 0, width, height);
-	--
-
+	local collectionList, collectionCount = session.GetMySession():GetCollection();
+	local collectionClassList, collectionClassCount = GetClassList("Collection");
+	local etcObject = GetMyEtcObject();
 	
-	
-	for i = 0, collectionCount - 1 do
-		local collectionClass = GetClassByIndexFromList(collectionList, i);
-		CreateCollectionItemControl(collectionControl, "DECKEX_" .. i, collectionClass, width, height);
+	for i = 0, collectionClassCount - 1 do
+		local collectionClass = GetClassByIndexFromList(collectionClassList, i);
+		local collection = collectionList:Get(collectionClass.ClassID);
+		CreateCollectionItemControl(collectionControl, collectionClass, collection, etcObject, "DECKEX_" .. i, width, height);
 
 		--itemControl:SetState(true);
 		--local nameControl = itemControl:CreateOrGetControl("richtext", "name" .. i, )
@@ -125,7 +149,7 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
 	collectionControl:UpdateItemList();
 
-	ui.SysMsg("OK collecz2");
+	ui.SysMsg("OK collecz3");
 end
 
 SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
