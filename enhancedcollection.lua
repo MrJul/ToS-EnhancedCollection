@@ -1,6 +1,8 @@
-local showUnknownCollections = false;
-local showCompleteCollections = true;
-local showIncompleteCollections = true;
+local config = {
+	showUnknownCollections = false,
+	showCompleteCollections = true,
+	showIncompleteCollections = true
+};
 local colorUnknown = "#808080";
 local colorComplete = "#FFD700";
 local colorIncomplete = "#FFFFFF";
@@ -23,20 +25,74 @@ local function GetCollectionColor(isUnknown, isComplete)
 	end
 end
 
+--function GET_COLLECTION_COUNT(type, coll)
+--
+--	local curCount = 0;
+--	if coll ~= nil then
+--		curCount = coll:GetItemCount();
+--	end
+--
+--	local info = geCollectionTable.Get(type);
+--	local maxCount = info:GetTotalItemCount();
+--
+--	return curCount, maxCount;
+--end
+
+local function GetUsefulItemInventoryCount(itemClass, collection, geCollection)
+	if itemClass == nil then
+		return 0;
+	end
+	
+	local neededItemCount = geCollection:GetNeedItemCount(itemClass.ClassID);
+	local collectionItemCount = collection:GetItemCountByType(itemClass.ClassID);
+	local inventoryItemCount = session.GetInvItemCountByType(itemClass.ClassID);
+	
+	local missingItemCount = neededItemCount - collectionItemCount;
+	if missingItemCount <= 0 then
+		return 0;
+	end
+
+	if inventoryItemCount >= missingItemCount then
+		return missingItemCount;
+	else
+		return inventoryItemCount;
+	end
+end
+
+local function GetUsefulItemsInventoryCount(collectionClass, collection, geCollection)
+	if collection == nil then
+		return 0;
+	end
+	
+	local usefulItemCount = 0;
+	for i = 1, 9 do
+		local itemName = collectionClass["ItemName_" .. i];
+		if itemName == "None" then
+			break;
+		end
+		usefulItemCount = usefulItemCount + GetUsefulItemInventoryCount(GetClass("Item", itemName), collection, geCollection);
+	end
+	return usefulItemCount;
+end
+
 local function CreateCollectionInfo(collectionClass, collection, etcObject)
-	local currentCount, maxCount = GET_COLLECTION_COUNT(collectionClass.ClassID, collection);
+	local geCollection = geCollectionTable.Get(collectionClass.ClassID);
+	local currentCount = collection ~= nil and collection:GetItemCount() or 0;
+	local maxCount = geCollection:GetTotalItemCount();
 	local isUnknown = collection == nil;
 	local isComplete = currentCount >= maxCount;
 	
 	return {
 		name = dictionary.ReplaceDicIDInCompStr(collectionClass.Name),
+		classID = collectionClass.ClassID,
 		currentCount = currentCount,
 		maxCount = maxCount,
+		inventoryCount = GetUsefulItemsInventoryCount(collectionClass, collection, geCollection),
 		isUnknown = isUnknown,
 		isComplete = isComplete,
 		isNew = etcObject["CollectionRead_" .. collectionClass.ClassID] == 0,
 		color = GetCollectionColor(isUnknown, isComplete)
-	}
+	};
 end
 
 local function CreateCollectionItemControl(collectionControl, collectionInfo, controlName, width, height)
@@ -44,6 +100,7 @@ local function CreateCollectionItemControl(collectionControl, collectionInfo, co
 	local itemControl = tolua.cast(collectionControl:CreateOrGetControl("controlset", controlName, 0, 0, width, height), "ui::CControlSet");
 	itemControl:SetGravity(ui.LEFT, ui.TOP);
 	itemControl:EnableHitTest(1);
+	itemControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
 	
 	local buttonControl = itemControl:CreateOrGetControl("button", "button", 8, 0, width - 8, height);
 	buttonControl:SetGravity(ui.LEFT, ui.TOP);
@@ -78,10 +135,15 @@ local function CreateCollectionItemControl(collectionControl, collectionInfo, co
 	left = left + nameWidth;
 		
 	local countControl = buttonControl:CreateOrGetControl("richtext", "count", left, 0, countControlWidth, height);
+	local countString = collectionInfo.currentCount .. " ";
+	if collectionInfo.inventoryCount > 0 then
+		countString = countString .. "{#1E90FF}(+" .. collectionInfo.inventoryCount .. "){/} ";
+	end
+	countString = countString .. "/ " .. collectionInfo.maxCount;
 	countControl:SetMargin(textMargin, 0, textMargin, 0);
 	countControl:SetGravity(ui.RIGHT, ui.CENTER_VERT);
 	countControl:EnableHitTest(0);
-	countControl:SetText("{ol}{" .. collectionInfo.color .. "} " .. collectionInfo.currentCount .. " / " .. collectionInfo.maxCount);
+	countControl:SetText("{ol}{" .. collectionInfo.color .. "} " .. countString);
 
 	return itemControl;
 
@@ -95,11 +157,11 @@ end
 
 local function PassesFilter(collectionInfo)
 	if collectionInfo.isUnknown then
-		return showUnknownCollections;
+		return config.showUnknownCollections;
 	elseif collectionInfo.isComplete then
-		return showCompleteCollections;
+		return config.showCompleteCollections;
 	else
-		return showIncompleteCollections;
+		return config.showIncompleteCollections;
 	end
 end
 
@@ -107,8 +169,6 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
 	ui.SysMsg("Updating collection");
 
-	local showAll = 1;
-	
 	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
 	DESTROY_CHILD_BYNAME(collectionControl, "DECK_");
 	DESTROY_CHILD_BYNAME(collectionControl, "DECKEX_");
@@ -142,42 +202,9 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 		
 		local collectionInfo = CreateCollectionInfo(collectionClass, collection, etcObject);
 		if PassesFilter(collectionInfo) then
-			local itemControl = CreateCollectionItemControl(collectionControl, collectionInfo, "DECKEX_" .. i, width, height);
-			itemControl:SetUserValue("COLLECTION_TYPE", collectionClass.ClassID);
+			CreateCollectionItemControl(collectionControl, collectionInfo, "DECKEX_" .. i, width, height);
 		end
-		--SET_COLLECTION_SET(frame, toto, collectionClass.ClassID, collection);
-
-		--itemControl:SetState(true);
-		--local nameControl = itemControl:CreateOrGetControl("richtext", "name" .. i, )
-		--nameControl:SetText("{ol}{ds}xxx" .. collectionClass.Name);
-		--
-		--local countControl = itemControl:CreateOrGetControl("richtext", "count", 0, 0, countWidth, height);
-		--countControl:SetText("0 (+2) / 5");
-
-		--local ctrlSet = col:CreateOrGetControlSet('deck', "DECK_" .. i, width, height);
-		--ctrlSet:ShowWindow(1);
-		--local coll = collections:Get(cls.ClassID);
-		--SET_COLLECTION_SET(frame, ctrlSet, cls.ClassID, coll);
 	end
-
-	--if showAll == 1 then
-	--	local clsList, cnt = GetClassList("Collection");
-	--	for i = 0 , cnt - 1 do
-	--		local cls = GetClassByIndexFromList(clsList, i);
-	--		local ctrlSet = col:CreateOrGetControlSet('deck', "DECK_" .. i, width, height);
-	--		ctrlSet:ShowWindow(1);
-	--		local coll = colls:Get(cls.ClassID);
-	--		SET_COLLECTION_SET(frame, ctrlSet, cls.ClassID, coll);
-	--	end
-	--else
-	--	local cnt = colls:Count();
-	--	for i = 0 , cnt - 1 do
-	--		local coll = colls:GetByIndex(i);
-	--		local ctrlSet = col:CreateOrGetControlSet('deck', "DECK_" .. i, width, height);
-	--		ctrlSet:ShowWindow(1);
-	--		SET_COLLECTION_SET(frame, ctrlSet, coll.type, coll);
-	--	end
-	--end
 	
 	if 'UNEQUIP' ~= addType and REMOVE_ITEM_SKILL ~= 7 then
 		imcSound.PlaySoundEvent("quest_ui_alarm_2");
@@ -185,41 +212,21 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
 	collectionControl:UpdateItemList();
 
-	ui.SysMsg("OK collec 7");
-end
-
-
-function DETAIL_UPDATE_HOOKED(frame, detailView, type, playEffect)
-	frame = tolua.cast(frame, "ui::CFrame");
-	local collectionClass = GetClassByType("Collection", type);
-	detailView:SetUserValue("CURRENT_TYPE", type);
-	detailView:RemoveAllChild();
-
-	
-	detailView:SetSkinName('None');
-	detailView:Resize(detailView:GetWidth(), 360);
-
-	
-
-	--local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
-	--collectionControl:UpdateItemList();
-
-	
-	ui.SysMsg("youpilol5");
+	ui.SysMsg("OK collec2!");
 end
 
 function ENHANCEDCOLLECTION_TOGGLE_SHOWUNKNOWNCOLLECTIONS(frame, checkBox)
-	showUnknownCollections = checkBox:IsChecked() == 1;
+	config.showUnknownCollections = checkBox:IsChecked() == 1;
 	UPDATE_COLLECTION_LIST(frame);
 end
 
 function ENHANCEDCOLLECTION_TOGGLE_SHOWCOMPLETECOLLECTIONS(frame, checkBox)
-	showCompleteCollections = checkBox:IsChecked() == 1;
+	config.showCompleteCollections = checkBox:IsChecked() == 1;
 	UPDATE_COLLECTION_LIST(frame);
 end
 
 function ENHANCEDCOLLECTION_TOGGLE_SHOWINCOMPLETECOLLECTIONS(frame, checkBox)
-	showIncompleteCollections = checkBox:IsChecked() == 1;
+	config.showIncompleteCollections = checkBox:IsChecked() == 1;
 	UPDATE_COLLECTION_LIST(frame);
 end
 
@@ -237,9 +244,9 @@ end
 
 local function CreateFilters()
 	local frame = ui.GetFrame("collection");
-	CreateFilter(frame, "SHOWUNKNOWNCOLLECTIONS", "Show {ol}{" .. colorUnknown .. "}unknown{/}{/} collections", showUnknownCollections, 20, 60);
-	CreateFilter(frame, "SHOWCOMPLETECOLLECTIONS", "Show {img collection_com 24 24}{ol}{" .. colorComplete .. "}complete{/}{/} collections", showCompleteCollections, 20, 90);
-	CreateFilter(frame, "SHOWINCOMPLETECOLLECTIONS", "Show {ol}{" .. colorIncomplete .. "}incomplete{/}{/} collections", showIncompleteCollections, 20, 120);
+	CreateFilter(frame, "SHOWUNKNOWNCOLLECTIONS", "Show {ol}{" .. colorUnknown .. "}unknown{/}{/} collections", config.showUnknownCollections, 20, 60);
+	CreateFilter(frame, "SHOWCOMPLETECOLLECTIONS", "Show {img collection_com 24 24}{ol}{" .. colorComplete .. "}complete{/}{/} collections", config.showCompleteCollections, 20, 90);
+	CreateFilter(frame, "SHOWINCOMPLETECOLLECTIONS", "Show {ol}{" .. colorIncomplete .. "}incomplete{/}{/} collections", config.showIncompleteCollections, 20, 120);
 end
 
 SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
@@ -265,8 +272,6 @@ SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
 
 
 CreateFilters();
-UPDATE_COLLECTION_LIST();
 
 --addon:RegisterMsg('ABILSHOP_OPEN', 'ON_ABILITYSHOP_OPEN');
 ui.SysMsg("Enhanced Collection v0.3 loaded!");
-
