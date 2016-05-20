@@ -1,13 +1,32 @@
+local sortTypes = {
+	default = 0,
+	name = 1,
+	status = 2
+};
+
 local options = {
 	showUnknownCollections = false,
 	showCompleteCollections = true,
-	showIncompleteCollections = true
+	showIncompleteCollections = true,
+	sortType = sortTypes.default
 };
 
 local colors = {
 	unknown = "#808080",
 	complete = "#FFD700",
 	incomplete = "#FFFFFF"
+};
+
+local statuses = {
+	incompleteNewWithInventoryItems = 0,
+	incompleteWithInventoryItems = 1,
+	incompleteNew = 2,
+	incomplete = 3,
+	complete = 4,
+	unknownNewWithInventoryItems = 5,
+	unknownWithInventoryItems = 6,
+	unknownNew = 7,
+	unknown = 8
 };
 
 local function TrimWithEllipsis(value, maxLength)
@@ -131,14 +150,6 @@ local function CreateCollectionItemControl(collectionControl, collectionInfo, co
 	countControl:EnableHitTest(0);
 	countControl:SetText("{ol}{" .. collectionInfo.color .. "} " .. countString);
 
-	return itemControl;
-
-	--local file, err = io.open( '../addons/debug.txt', 'w' );
-	--for key,value in pairs(getmetatable(completionControl)) do
-	--	file:write( key .. '\n' );
-	--end
-	--file:close();
-
 end
 
 local function PassesFilter(collectionInfo)
@@ -151,7 +162,55 @@ local function PassesFilter(collectionInfo)
 	end
 end
 
-local function SortCollectionInfo(x, y)
+local function GetStatus(collectionInfo)
+
+	if collectionInfo.inventoryCount > 0 then
+		if collectionInfo.isUnknown then
+			if collectionInfo.isNew then
+				return statuses.unknownNewWithInventoryItems;
+			else
+				return statuses.unknownWithInventoryItems;
+			end
+		else
+			if collectionInfo.isNew then
+				return statuses.incompleteNewWithInventoryItems;
+			else
+				return statuses.incompleteWithInventoryItems;
+			end
+		end
+	end
+
+	if collectionInfo.isNew then
+		if collectionInfo.isUnknown then
+			return statuses.unknownNew;
+		else
+			return statuses.incompleteNew;
+		end
+	end
+
+	if collectionInfo.isComplete then
+		return statuses.complete;
+	end
+
+	if collectionInfo.isUnknown then
+		return statuses.unknown;
+	end
+
+	return statuses.incomplete;
+
+end
+
+local function SortCollectionByName(x, y)
+	return x.name < y.name;
+end
+
+local function SortCollectionByStatus(x, y)
+	local xStatus = GetStatus(x);
+	local yStatus = GetStatus(y);
+	if xStatus ~= yStatus then
+		return xStatus < yStatus;
+	end
+	
 	return x.name < y.name;
 end
 
@@ -161,16 +220,16 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
 	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
 	collectionControl:RemoveAllChild();
-	collectionControl:HideDetailView();
 	collectionControl:EnableHitTest(1);
 	collectionControl:SetPos(collectionControl:GetX(), 160);
-	collectionControl:Resize(533, 850);
+	collectionControl:Resize(533, 800);
 	collectionControl:SetItemSpace(0, 0);
-	
-	local bgControl = frame:CreateOrGetControl("groupbox", "itemsbg", collectionControl:GetX(), collectionControl:GetY(), 530, collectionControl:GetHeight());
+
+	local bgControl = tolua.cast(frame:CreateOrGetControl("groupbox", "itemsbg", collectionControl:GetX(), collectionControl:GetY(), 530, 850), "ui::CGroupBox");
 	bgControl:SetGravity(ui.LEFT, ui.TOP);
 	bgControl:SetSkinName("test_frame_midle");
 	bgControl:EnableHitTest(0);
+	bgControl:EnableScrollBar(0);
 	frame:MoveChildBefore(bgControl, frame:GetChildIndex("col"));
 	
 	local width = 505;
@@ -195,11 +254,15 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 		end
 	end
 
-	table.sort(collectionInfoList, SortCollectionInfo);
+	if options.sortType == sortTypes.name then
+		table.sort(collectionInfoList, SortCollectionByName);
+	elseif options.sortType == sortTypes.status then
+		table.sort(collectionInfoList, SortCollectionByStatus);
+	end
 
 	for index, collectionInfo in ipairs(collectionInfoList) do
 		CreateCollectionItemControl(collectionControl, collectionInfo, "DECKEX_" .. index, width, height);
-	end;
+	end
 	
 	if addType ~= "UNEQUIP" and REMOVE_ITEM_SKILL ~= 7 then
 		imcSound.PlaySoundEvent("quest_ui_alarm_2");
@@ -210,16 +273,27 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	ui.SysMsg("OK collec2!");
 end
 
+local function UpdateAfterOptionChanged(frame)
+	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
+	collectionControl:HideDetailView();
+	UPDATE_COLLECTION_LIST(frame);
+end
+
+local function GetConfigKey(optionKey)
+	return "EnhancedCollection_" .. optionKey;
+end
+
 local function CreateFilter(frame, optionKey, text, y)
-	local configKey = "EnhancedCollection_" .. optionKey;
+
+	local configKey = GetConfigKey(optionKey);
 	options[optionKey] = config.GetConfigInt(configKey, options[optionKey] and 1 or 0) ~= 0;
 	
 	local eventScriptName = "ENHANCEDCOLLECTION_TOGGLE_" .. optionKey;
 	_G[eventScriptName] = function(frame, checkBox)
 		options[optionKey] = checkBox:IsChecked() == 1;
-		UPDATE_COLLECTION_LIST(frame);
+		UpdateAfterOptionChanged(frame);
 		config.SetConfig(configKey, options[optionKey] and 1 or 0);
-	end;
+	end
 
 	local checkBox = tolua.cast(frame:CreateOrGetControl("checkbox", "FILTER_" .. optionKey, 30, y, 250, 30), "ui::CCheckBox");
 	checkBox:SetGravity(ui.LEFT, ui.TOP);
@@ -228,9 +302,9 @@ local function CreateFilter(frame, optionKey, text, y)
 	checkBox:SetAnimation("MouseOffAnim", "btn_mouseoff");
 	checkBox:SetClickSound("button_click_big");
 	checkBox:SetOverSound("button_over");
-	
 	checkBox:SetEventScript(ui.LBUTTONUP, eventScriptName);
 	checkBox:SetCheck(options[optionKey] and 1 or 0);
+
 end
 
 local function CreateFilters()
@@ -240,9 +314,52 @@ local function CreateFilters()
 	CreateFilter(frame, "showIncompleteCollections", "Show {ol}{" .. colors.incomplete .. "}incomplete{/}{/} collections", 120);
 end
 
+local function CreateSortButton(frame, sortType, text, y, radioGroup)
+
+	local configKey = GetConfigKey("sortType");
+	options.sortType = config.GetConfigInt(configKey, options.sortType);
+
+	local eventScriptName = "ENHANCEDCOLLECTION_SETSORT_" .. sortType;
+	_G[eventScriptName] = function(frame, radioButton)
+		if radioButton:IsChecked() then
+			options.sortType = sortType;
+			UpdateAfterOptionChanged(frame);
+			config.SetConfig(configKey, options.sortType);
+		end
+	end
+
+	local radioButton = tolua.cast(frame:CreateOrGetControl("radiobutton", "SORT_" .. sortType, 330, y, 250, 30), "ui::CRadioButton");
+	radioButton:SetGravity(ui.LEFT, ui.TOP);
+	radioButton:SetText("{@st68}" .. text);
+	radioButton:SetAnimation("MouseOnAnim", "btn_mouseover");
+	radioButton:SetAnimation("MouseOffAnim", "btn_mouseoff");
+	radioButton:SetClickSound("button_click_big_2");
+	radioButton:SetOverSound("button_over");
+	radioButton:SetEventScript(ui.LBUTTONUP, eventScriptName);
+
+	if radioGroup ~= nil then
+		radioButton:AddToGroup(radioGroup);
+	end
+	
+	if options.sortType == sortType then
+		radioButton:Select();
+	end
+
+	return radioButton;
+
+end
+
+local function CreateSortButtons()
+	local frame = ui.GetFrame("collection");
+	local radioGroup = CreateSortButton(frame, sortTypes.default, "Sort by game order", 60);
+	CreateSortButton(frame, sortTypes.name, "Sort by name", 90, radioGroup);
+	CreateSortButton(frame, sortTypes.status, "Sort by status", 120, radioGroup);
+end
+
 function COLLECTION_FIRST_OPEN_HOOKED(frame)
 	GET_CHILD(frame, "showoption", "ui::CDropList"):ShowWindow(0);
 	CreateFilters();
+	CreateSortButtons();
 	UPDATE_COLLECTION_LIST(frame);
 end
 
@@ -250,5 +367,6 @@ SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
 SETUP_HOOK(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 
 CreateFilters();
+CreateSortButtons();
 
 ui.SysMsg("Enhanced Collection v0.3 loaded!");
