@@ -1,11 +1,14 @@
-local config = {
+local options = {
 	showUnknownCollections = false,
 	showCompleteCollections = true,
 	showIncompleteCollections = true
 };
-local colorUnknown = "#808080";
-local colorComplete = "#FFD700";
-local colorIncomplete = "#FFFFFF";
+
+local colors = {
+	unknown = "#808080",
+	complete = "#FFD700",
+	incomplete = "#FFFFFF"
+};
 
 local function TrimWithEllipsis(value, maxLength)
 	if string.len(value) > maxLength then
@@ -17,34 +20,21 @@ end
 
 local function GetCollectionColor(isUnknown, isComplete)
 	if isUnknown then
-		return colorUnknown;
+		return colors.unknown;
 	elseif isComplete then
-		return colorComplete;
+		return colors.complete;
 	else
-		return colorIncomplete;
+		return colors.incomplete;
 	end
 end
-
---function GET_COLLECTION_COUNT(type, coll)
---
---	local curCount = 0;
---	if coll ~= nil then
---		curCount = coll:GetItemCount();
---	end
---
---	local info = geCollectionTable.Get(type);
---	local maxCount = info:GetTotalItemCount();
---
---	return curCount, maxCount;
---end
 
 local function GetUsefulItemInventoryCount(itemClass, collection, geCollection)
 	if itemClass == nil then
 		return 0;
 	end
-	
+
 	local neededItemCount = geCollection:GetNeedItemCount(itemClass.ClassID);
-	local collectionItemCount = collection:GetItemCountByType(itemClass.ClassID);
+	local collectionItemCount = collection and collection:GetItemCountByType(itemClass.ClassID) or 0;
 	local inventoryItemCount = session.GetInvItemCountByType(itemClass.ClassID);
 	
 	local missingItemCount = neededItemCount - collectionItemCount;
@@ -60,10 +50,6 @@ local function GetUsefulItemInventoryCount(itemClass, collection, geCollection)
 end
 
 local function GetUsefulItemsInventoryCount(collectionClass, collection, geCollection)
-	if collection == nil then
-		return 0;
-	end
-	
 	local usefulItemCount = 0;
 	for i = 1, 9 do
 		local itemName = collectionClass["ItemName_" .. i];
@@ -157,12 +143,16 @@ end
 
 local function PassesFilter(collectionInfo)
 	if collectionInfo.isUnknown then
-		return config.showUnknownCollections;
+		return options.showUnknownCollections;
 	elseif collectionInfo.isComplete then
-		return config.showCompleteCollections;
+		return options.showCompleteCollections;
 	else
-		return config.showIncompleteCollections;
+		return options.showIncompleteCollections;
 	end
+end
+
+local function SortCollectionInfo(x, y)
+	return x.name < y.name;
 end
 
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
@@ -170,11 +160,9 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	ui.SysMsg("Updating collection");
 
 	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
-	DESTROY_CHILD_BYNAME(collectionControl, "DECK_");
-	DESTROY_CHILD_BYNAME(collectionControl, "DECKEX_");
-
-	--collectionControl:RemoveAllChild();
-
+	collectionControl:RemoveAllChild();
+	collectionControl:HideDetailView();
+	collectionControl:EnableHitTest(1);
 	collectionControl:SetPos(collectionControl:GetX(), 160);
 	collectionControl:Resize(533, 850);
 	collectionControl:SetItemSpace(0, 0);
@@ -189,24 +177,31 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	local countWidth = 40;
 	local height = 40;
 	collectionControl:SetItemSize(width, height);
-
-	collectionControl:EnableHitTest(1);
-
+	
 	local collectionList, collectionCount = session.GetMySession():GetCollection();
 	local collectionClassList, collectionClassCount = GetClassList("Collection");
 	local etcObject = GetMyEtcObject();
+
+	local collectionInfoList = {};
 	
+	local collectionInfoIndex = 1;
 	for i = 0, collectionClassCount - 1 do
 		local collectionClass = GetClassByIndexFromList(collectionClassList, i);
 		local collection = collectionList:Get(collectionClass.ClassID);
-		
 		local collectionInfo = CreateCollectionInfo(collectionClass, collection, etcObject);
 		if PassesFilter(collectionInfo) then
-			CreateCollectionItemControl(collectionControl, collectionInfo, "DECKEX_" .. i, width, height);
+			collectionInfoList[collectionInfoIndex] = collectionInfo;
+			collectionInfoIndex = collectionInfoIndex + 1;
 		end
 	end
+
+	table.sort(collectionInfoList, SortCollectionInfo);
+
+	for index, collectionInfo in ipairs(collectionInfoList) do
+		CreateCollectionItemControl(collectionControl, collectionInfo, "DECKEX_" .. index, width, height);
+	end;
 	
-	if 'UNEQUIP' ~= addType and REMOVE_ITEM_SKILL ~= 7 then
+	if addType ~= "UNEQUIP" and REMOVE_ITEM_SKILL ~= 7 then
 		imcSound.PlaySoundEvent("quest_ui_alarm_2");
 	end
 
@@ -215,63 +210,45 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	ui.SysMsg("OK collec2!");
 end
 
-function ENHANCEDCOLLECTION_TOGGLE_SHOWUNKNOWNCOLLECTIONS(frame, checkBox)
-	config.showUnknownCollections = checkBox:IsChecked() == 1;
-	UPDATE_COLLECTION_LIST(frame);
-end
+local function CreateFilter(frame, optionKey, text, y)
+	local configKey = "EnhancedCollection_" .. optionKey;
+	options[optionKey] = config.GetConfigInt(configKey, options[optionKey] and 1 or 0) ~= 0;
+	
+	local eventScriptName = "ENHANCEDCOLLECTION_TOGGLE_" .. optionKey;
+	_G[eventScriptName] = function(frame, checkBox)
+		options[optionKey] = checkBox:IsChecked() == 1;
+		UPDATE_COLLECTION_LIST(frame);
+		config.SetConfig(configKey, options[optionKey] and 1 or 0);
+	end;
 
-function ENHANCEDCOLLECTION_TOGGLE_SHOWCOMPLETECOLLECTIONS(frame, checkBox)
-	config.showCompleteCollections = checkBox:IsChecked() == 1;
-	UPDATE_COLLECTION_LIST(frame);
-end
-
-function ENHANCEDCOLLECTION_TOGGLE_SHOWINCOMPLETECOLLECTIONS(frame, checkBox)
-	config.showIncompleteCollections = checkBox:IsChecked() == 1;
-	UPDATE_COLLECTION_LIST(frame);
-end
-
-local function CreateFilter(frame, name, text, isEnabled, x, y)
-	local checkBox = tolua.cast(frame:CreateOrGetControl("checkbox", "FILTER_" .. name, x, y, 250, 30), "ui::CCheckBox");
+	local checkBox = tolua.cast(frame:CreateOrGetControl("checkbox", "FILTER_" .. optionKey, 30, y, 250, 30), "ui::CCheckBox");
 	checkBox:SetGravity(ui.LEFT, ui.TOP);
 	checkBox:SetText("{@st68}" .. text);
 	checkBox:SetAnimation("MouseOnAnim", "btn_mouseover");
 	checkBox:SetAnimation("MouseOffAnim", "btn_mouseoff");
 	checkBox:SetClickSound("button_click_big");
 	checkBox:SetOverSound("button_over");
-	checkBox:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_TOGGLE_" .. name);
-	checkBox:SetCheck(isEnabled and 1 or 0);
+	
+	checkBox:SetEventScript(ui.LBUTTONUP, eventScriptName);
+	checkBox:SetCheck(options[optionKey] and 1 or 0);
 end
 
 local function CreateFilters()
 	local frame = ui.GetFrame("collection");
-	CreateFilter(frame, "SHOWUNKNOWNCOLLECTIONS", "Show {ol}{" .. colorUnknown .. "}unknown{/}{/} collections", config.showUnknownCollections, 20, 60);
-	CreateFilter(frame, "SHOWCOMPLETECOLLECTIONS", "Show {img collection_com 24 24}{ol}{" .. colorComplete .. "}complete{/}{/} collections", config.showCompleteCollections, 20, 90);
-	CreateFilter(frame, "SHOWINCOMPLETECOLLECTIONS", "Show {ol}{" .. colorIncomplete .. "}incomplete{/}{/} collections", config.showIncompleteCollections, 20, 120);
+	CreateFilter(frame, "showUnknownCollections", "Show {ol}{" .. colors.unknown .. "}unknown{/}{/} collections", 60);
+	CreateFilter(frame, "showCompleteCollections", "Show {img collection_com 24 24}{ol}{" .. colors.complete .. "}complete{/}{/} collections", 90);
+	CreateFilter(frame, "showIncompleteCollections", "Show {ol}{" .. colors.incomplete .. "}incomplete{/}{/} collections", 120);
+end
+
+function COLLECTION_FIRST_OPEN_HOOKED(frame)
+	GET_CHILD(frame, "showoption", "ui::CDropList"):ShowWindow(0);
+	CreateFilters();
+	UPDATE_COLLECTION_LIST(frame);
 end
 
 SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
---SETUP_HOOK(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
-
---USE_COLLECTION_SHOW_ALL = 1;
---local frame = ui.GetFrame("collection");
---local showoption = GET_CHILD(frame, "showoption", "ui::CDropList");
---showoption:ShowWindow(1);
-
-
---local xx = _G["ADDONS"]["expcardcalculator"]["addon"];
---local file, err = io.open( '../addons/debug.txt', 'w' );
---local metat = getmetatable(xx);
---if metat == nil then
---	file:write("nil :(");
---else
-	--for key,value in pairs(_G) do
-	--	file:write( key .. '\n' );
-	--end
---end
---file:close();
-
+SETUP_HOOK(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 
 CreateFilters();
 
---addon:RegisterMsg('ABILSHOP_OPEN', 'ON_ABILITYSHOP_OPEN');
 ui.SysMsg("Enhanced Collection v0.3 loaded!");
