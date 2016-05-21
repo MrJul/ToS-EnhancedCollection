@@ -117,8 +117,6 @@ local function ResizeCollectionItemControl(itemControl, heightOffset)
 		return;
 	end
 
-	ui.SysMsg("resizing " .. itemControl:GetName() .. " to " .. heightOffset);
-
 	itemControl:Resize(itemControl:GetWidth(), itemControl:GetHeight() + heightOffset);
 
 	local itemsContainer = itemControl:GetParent();
@@ -142,8 +140,6 @@ local function EnsureCollectionItemDetailCreated(itemControl, frame)
 		detailControl:EnableHitTest(1);
 		detailControl:EnableScrollBar(0);
 	end
-
-	ui.SysMsg("making detail");
 
 	MAKE_DECK_DETAIL(frame, nil, itemControl, detailControl);
 	local heightOffset = detailControl:GetHeight() - heightBefore;
@@ -176,10 +172,6 @@ function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemsContainer, itemControl)
 
 	local detailControl = itemControl:GetChild("detail");
 	local frame = itemsContainer:GetParent():GetParent();
-	--local itemsContainer = itemControl:GetParent();
-	ui.SysMsg("itemControl=" .. itemControl:GetName());
-	ui.SysMsg("itemsContainer=" .. itemsContainer:GetName());
-	ui.SysMsg("frame=" .. frame:GetName());
 
 	if detailControl ~= nil then
 		EnsureCollectionItemDetailRemoved(itemControl, frame);
@@ -404,7 +396,6 @@ local function GetDetailItemIconColorTone(itemInfo)
 	end
 end
 
-
 local function CreateDetailItemControl(detailControl, itemClass, collectionClass, collection, geCollection, controlName, y)
 
 	local itemInfo = GetItemInfo(itemClass, collection, geCollection);
@@ -416,27 +407,36 @@ local function CreateDetailItemControl(detailControl, itemClass, collectionClass
 	--itemControl:SetSkinName("labelbox");
 
 	local slot = tolua.cast(itemControl:CreateOrGetControl("slot", "slot", 0, 0, 48, height), "ui::CSlot");
-	local isSlotEnabled = (collection ~= nil) and (itemInfo.currentCount > itemInfo.neededCount or itemInfo.usefulInventoryCount > 0);
+	local isKnownCollection = collection ~= nil;
+	local canTake = isKnownCollection and itemInfo.currentCount > itemInfo.neededCount;
+	local canDrop = isKnownCollection and itemInfo.usefulInventoryCount > 0;
+
 	slot:SetGravity(ui.LEFT, ui.CENTER_VERT);
 	slot:SetSkinName("invenslot2");
 	slot:EnableDrag(0);
-	slot:EnableHitTest(isSlotEnabled and 1 or 0);
+	slot:EnableHitTest((canTake or canDrop) and 1 or 0);
 	slot:SetOverSound("button_cursor_over_2");
 	slot:SetUserValue("COLLECTION_TYPE", collectionClass.ClassID);
-	slot:SetColorTone(isSlotEnabled and "FFFFFFFF" or "00FFFFFF");
+	slot:SetColorTone((canTake or canDrop) and "FFFFFFFF" or "00FFFFFF");
+	if canTake then
+		slot:SetEventScript(ui.RBUTTONUP, "COLLECTION_TAKE2");
+	end
+	if canDrop then
+		slot:SetEventScript(ui.DROP, "COLLECTION_DROP");
+	end
 
 	local icon = CreateIcon(slot);
 	icon:SetImage(itemClass.Icon);
 	icon:SetColorTone(GetDetailItemIconColorTone(itemInfo));
 
-	local nameControl = itemControl:CreateOrGetControl("richtext", "name", 64, 0, width - 90 - 64, height);
+	local nameControl = itemControl:CreateOrGetControl("richtext", "name", 64, 0, width - 64, height);
 	nameControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
 	nameControl:EnableHitTest(0);
 	nameControl:SetText(GET_FULL_NAME(itemClass));
 
 	local countControl = itemControl:CreateOrGetControl("richtext", "count", 0, 0, width, height);
 	local countString = MakeCountString(itemInfo);
-	local color = GetCollectionColor(collection == nil, itemInfo.currentCount >= itemInfo.neededCount);
+	local color = GetCollectionColor(not isKnownCollection, itemInfo.currentCount >= itemInfo.neededCount);
 	countControl:SetMargin(10, 0, 0, 0);
 	countControl:SetGravity(ui.RIGHT, ui.CENTER_VERT);
 	countControl:EnableHitTest(0);
@@ -452,11 +452,8 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, playEffect)
 
 	detailControl:SetUserValue("CURRENT_TYPE", type);
 	detailControl:RemoveAllChild();
-	--detailControl:SetSkinName("rank_two_skin");
 	detailControl:EnableHitTest(1);
 	detailControl:EnableScrollBar(0);
-
-	ui.SysMsg("detailControl=" .. tolua.type(detailControl));
 
 	local line = detailControl:CreateOrGetControl("labelline", "line", 0, 0, detailControl:GetWidth(), 10);
 	line:SetSkinName("labelline_def_2");
