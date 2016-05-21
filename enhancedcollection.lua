@@ -315,8 +315,6 @@ end
 
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
-	ui.SysMsg("Updating collection...");
-
 	-- Hide the CCollection control: we're not using it because of the following issues:
 	--    - Scrolling doesn't correctly calculate hidden items when the detail is present.
 	--    - Resize doesn't invalidate the scrollbar.
@@ -374,8 +372,6 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	if addType ~= "UNEQUIP" and REMOVE_ITEM_SKILL ~= 7 then
 		imcSound.PlaySoundEvent("quest_ui_alarm_2");
 	end
-
-	ui.SysMsg("Collection updated.");
 
 end
 
@@ -458,12 +454,15 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect
 	detailControl:EnableHitTest(1);
 	detailControl:EnableScrollBar(0);
 
-	local line = detailControl:CreateOrGetControl("labelline", "line", 0, 0, detailControl:GetWidth(), 10);
-	line:SetSkinName("labelline_def_2");
+	local lineControl = detailControl:CreateOrGetControl("labelline", "line", 0, 0, detailControl:GetWidth(), 10);
+	lineControl:SetGravity(ui.LEFT, ui.TOP);
+	lineControl:EnableHitTest(0);
+	lineControl:SetSkinName("labelline_def_2");
 
 	local collectionClass = GetClassByType("Collection", type);
 	local collection = session.GetMySession():GetCollection():Get(collectionClass.ClassID);
 	local geCollection = geCollectionTable.Get(collectionClass.ClassID);
+	local isCollectionComplete = collection ~= nil and collection:GetItemCount() >= geCollection:GetTotalItemCount();
 
 	local y = 20;
 	local handledItemClasses = {}; -- avoid duplicates (appears in Bellai Rainforest collection)
@@ -482,16 +481,30 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect
 		end
 
 	end
-
-	detailControl:Resize(detailControl:GetWidth(), y);
+	y = y + 10;
 
 	-- BUG: if a complete collection is open and the inventory changes, a sound is playing incorrectly.
 	-- This bug is also present in the original collection.lua code.
-	if shouldPlayEffect == 1 and collection ~= nil and collection:GetItemCount() >= geCollection:GetTotalItemCount() then
+	if shouldPlayEffect == 1 and isCollectionComplete then
 		local posX, posY = GET_SCREEN_XY(detailControl);
 		movie.PlayUIEffect("SYS_quest_mark", posX, posY, 1.0);
 		imcSound.PlaySoundEvent(frame:GetUserConfig("SOUND_COLLECTION"));
 	end
+
+	local abilityGroupControl = tolua.cast(detailControl:CreateOrGetControl("groupbox", "abilitygroup", 0, y, detailControl:GetWidth(), 30), "ui::CGroupBox");
+	abilityGroupControl:SetGravity(ui.LEFT, ui.TOP);
+	abilityGroupControl:EnableHitTest(0);
+	abilityGroupControl:EnableScrollBar(0);
+	abilityGroupControl:SetSkinName("test_weight_skin");
+	y = y + abilityGroupControl:GetHeight();
+
+	local color = GetCollectionColor(collection == nil, isCollectionComplete);
+	local abilityTextControl = abilityGroupControl:CreateOrGetControl("richtext", "abilitytext", 10, 0, detailControl:GetWidth() - 20, 30);
+	abilityTextControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
+	abilityTextControl:EnableHitTest(0);
+	abilityTextControl:SetText("{ol}{" .. color .. "}" .. ClMsg("CollectionEffect") .. ": " .. GET_COLLECTION_EFFECT_DESC(type));
+
+	detailControl:Resize(detailControl:GetWidth(), y + 8);
 
 end
 
