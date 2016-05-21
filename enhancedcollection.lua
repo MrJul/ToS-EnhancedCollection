@@ -75,6 +75,7 @@ local function GetItemInfo(itemClass, collection, geCollection)
 	return itemInfo;
 end
 
+-- Returns the number of inventory items that can be used to progress a given collection.
 local function GetUsefulItemsInventoryCount(collectionClass, collection, geCollection)
 	local usefulItemCount = 0;
 	for i = 1, 9 do
@@ -112,6 +113,7 @@ local function GetItemControlName(collectionClassID)
 	return "DECKEX_" .. collectionClassID;
 end
 
+-- Resizes a collection item.
 local function ResizeCollectionItemControl(itemControl, heightOffset)
 	if heightOffset == 0 then
 		return;
@@ -127,6 +129,7 @@ local function ResizeCollectionItemControl(itemControl, heightOffset)
 	end
 end
 
+-- Adds a detail to a collection item, if it didn't exist.
 local function EnsureCollectionItemDetailCreated(itemControl, frame, shouldPlayEffect)
 
 	local detailControl = itemControl:GetChild("detail");
@@ -151,6 +154,7 @@ local function EnsureCollectionItemDetailCreated(itemControl, frame, shouldPlayE
 
 end
 
+-- Removes a detail from a collection item, if it exists.
 local function EnsureCollectionItemDetailRemoved(itemControl, frame)
 	local detailControl = itemControl:GetChild("detail");
 	if detailControl ~= nil then
@@ -161,6 +165,7 @@ local function EnsureCollectionItemDetailRemoved(itemControl, frame)
 	end
 end
 
+-- Returns the current selected detail control.
 local function GetCurrentDetailItemControl(frame, itemsContainer)
 	local currentDetailCollectionClassID = frame:GetUserIValue("DETAIL_VIEW_TYPE");
 	if currentDetailCollectionClassID ~= nil then
@@ -170,6 +175,7 @@ local function GetCurrentDetailItemControl(frame, itemsContainer)
 	end
 end
 
+-- Shows a detail of a collection if it's hidden, and vice-versa.
 function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemsContainer, itemControl)
 	imcSound.PlaySoundEvent("cllection_inven_open");
 
@@ -187,6 +193,7 @@ function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemsContainer, itemControl)
 	end
 end
 
+-- Returns a string containing the various counts of a collection or item.
 local function MakeCountString(info)
 	local countString = info.currentCount .. " ";
 	if info.usefulInventoryCount > 0 then
@@ -196,6 +203,7 @@ local function MakeCountString(info)
 	return countString;
 end
 
+-- Creates an item control for a collection.
 local function CreateCollectionItemControl(itemsContainer, collectionInfo, controlName, y, width, height)
 
 	local itemControl = itemsContainer:CreateOrGetControl("button", controlName, 8, y, width - 8, height);
@@ -246,6 +254,7 @@ local function CreateCollectionItemControl(itemsContainer, collectionInfo, contr
 
 end
 
+-- Returns whether a given collection is displayed according to the current filters.
 local function PassesFilter(collectionInfo)
 	if collectionInfo.isUnknown then
 		return options.showUnknownCollections;
@@ -256,6 +265,7 @@ local function PassesFilter(collectionInfo)
 	end
 end
 
+-- Returns whether a given collection is displayed according to the current search text.
 local function PassesSearch(collectionInfo, searchText)
 	if searchText == nil or string.len(searchText) == 0 then
 		return true;
@@ -265,6 +275,7 @@ local function PassesSearch(collectionInfo, searchText)
 	end
 end
 
+-- Gets the status of a collection.
 local function GetStatus(collectionInfo)
 
 	if collectionInfo.usefulInventoryCount > 0 then
@@ -317,7 +328,10 @@ local function SortCollectionByStatus(x, y)
 	return x.name < y.name;
 end
 
+-- Updates the full collection list.
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
+
+	ui.SysMsg("addType=" .. (addType ~= nil and addType or "nil") .. "; removeType=" .. (removeType ~= nil and removeType or "nil"));
 
 	-- Hide the CCollection control: we're not using it because of the following issues:
 	--    - Scrolling doesn't correctly calculate hidden items when the detail is present.
@@ -383,6 +397,7 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
 end
 
+-- Updates the current selected collection detail.
 local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
 	local itemsContainer = GET_CHILD(frame, "itemscontainer", "ui::CGroupBox");
 	if itemsContainer ~= nil then
@@ -393,6 +408,7 @@ local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
 	end
 end
 
+-- Returns the color tone of an item's icon.
 local function GetDetailItemIconColorTone(itemInfo)
 	if itemInfo.currentCount >= itemInfo.neededCount then
 		return "FFFFFFFF";
@@ -403,6 +419,7 @@ local function GetDetailItemIconColorTone(itemInfo)
 	end
 end
 
+-- Creates a new detail for an item contained in a given collection.
 local function CreateDetailItemControl(detailControl, itemClass, collectionClass, collection, geCollection, controlName, y)
 
 	local itemInfo = GetItemInfo(itemClass, collection, geCollection);
@@ -454,6 +471,7 @@ local function CreateDetailItemControl(detailControl, itemClass, collectionClass
 	return itemControl;
 end
 
+-- Updates the detail of a collection.
 local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect)
 
 	detailControl:SetUserValue("CURRENT_TYPE", type);
@@ -470,6 +488,10 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect
 	local collection = session.GetMySession():GetCollection():Get(collectionClass.ClassID);
 	local geCollection = geCollectionTable.Get(collectionClass.ClassID);
 	local isCollectionComplete = collection ~= nil and collection:GetItemCount() >= geCollection:GetTotalItemCount();
+
+	if GetMyEtcObject()["CollectionRead_" .. type] ~= 1 then
+		ui.Chat(string.format("/readcollection %d", type));
+	end
 
 	local y = 20;
 	local handledItemClasses = {}; -- avoid duplicates (appears in Bellai Rainforest collection)
