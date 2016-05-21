@@ -127,7 +127,7 @@ local function ResizeCollectionItemControl(itemControl, heightOffset)
 	end
 end
 
-local function EnsureCollectionItemDetailCreated(itemControl, frame)
+local function EnsureCollectionItemDetailCreated(itemControl, frame, shouldPlayEffect)
 
 	local detailControl = itemControl:GetChild("detail");
 	local heightBefore;
@@ -141,7 +141,10 @@ local function EnsureCollectionItemDetailCreated(itemControl, frame)
 		detailControl:EnableScrollBar(0);
 	end
 
-	MAKE_DECK_DETAIL(frame, nil, itemControl, detailControl);
+	local collectionType = itemControl:GetUserIValue("COLLECTION_TYPE");
+	frame:SetUserValue("DETAIL_VIEW_TYPE", collectionType);
+	DETAIL_UPDATE(frame, detailControl, collectionType, shouldPlayEffect);
+
 	local heightOffset = detailControl:GetHeight() - heightBefore;
 
 	ResizeCollectionItemControl(itemControl, heightOffset);
@@ -180,7 +183,7 @@ function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemsContainer, itemControl)
 		if currentDetailItemControl ~= nil then
 			EnsureCollectionItemDetailRemoved(currentDetailItemControl, frame);
 		end
-		EnsureCollectionItemDetailCreated(itemControl, frame);
+		EnsureCollectionItemDetailCreated(itemControl, frame, 0);
 	end
 end
 
@@ -363,7 +366,7 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 		local itemControlName = GetItemControlName(collectionInfo.classID);
 		local itemControl = CreateCollectionItemControl(itemsContainer, collectionInfo, itemControlName, y, width, height, showDetail);
 		if detailCollectionClassID == collectionInfo.classID then
-			EnsureCollectionItemDetailCreated(itemControl, frame);
+			EnsureCollectionItemDetailCreated(itemControl, frame, 0);
 		end
 		y = y + itemControl:GetHeight();
 	end
@@ -381,7 +384,7 @@ local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
 	if itemsContainer ~= nil then
 		local currentDetailItemControl = GetCurrentDetailItemControl(frame, itemsContainer);
 		if currentDetailItemControl ~= nil then
-			EnsureCollectionItemDetailCreated(currentDetailItemControl, frame);
+			EnsureCollectionItemDetailCreated(currentDetailItemControl, frame, 1);
 		end
 	end
 end
@@ -448,7 +451,7 @@ local function CreateDetailItemControl(detailControl, itemClass, collectionClass
 	return itemControl;
 end
 
-local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, playEffect)
+local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect)
 
 	detailControl:SetUserValue("CURRENT_TYPE", type);
 	detailControl:RemoveAllChild();
@@ -481,6 +484,14 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, playEffect)
 	end
 
 	detailControl:Resize(detailControl:GetWidth(), y);
+
+	-- BUG: if a complete collection is open and the inventory changes, a sound is playing incorrectly.
+	-- This bug is also present in the original collection.lua code.
+	if shouldPlayEffect == 1 and collection ~= nil and collection:GetItemCount() >= geCollection:GetTotalItemCount() then
+		local posX, posY = GET_SCREEN_XY(detailControl);
+		movie.PlayUIEffect("SYS_quest_mark", posX, posY, 1.0);
+		imcSound.PlaySoundEvent(frame:GetUserConfig("SOUND_COLLECTION"));
+	end
 
 end
 
