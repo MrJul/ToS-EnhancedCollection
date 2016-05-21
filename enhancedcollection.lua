@@ -136,7 +136,7 @@ local function EnsureCollectionItemDetailCreated(itemControl, frame, shouldPlayE
 	else
 		heightBefore = 0;
 		detailControl = tolua.cast(itemControl:CreateOrGetControl("groupbox", "detail", 17, itemControl:GetHeight() - 8, itemControl:GetWidth() - 35, 0), "ui::CGroupBox");
-		detailControl:SetSkinName("None");
+		detailControl:SetSkinName("");
 		detailControl:EnableHitTest(1);
 		detailControl:EnableScrollBar(0);
 	end
@@ -327,9 +327,9 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	collectionControl:EnableHitTest(0);
 	collectionControl:ShowWindow(0);
 
-	local itemsContainer = tolua.cast(frame:CreateOrGetControl("groupbox", "itemscontainer", 10, 160, 530, 800), "ui::CGroupBox");
+	local itemsContainer = tolua.cast(frame:CreateOrGetControl("groupbox", "itemscontainer", 10, 160, 533, 797), "ui::CGroupBox");
 	itemsContainer:SetGravity(ui.LEFT, ui.TOP);
-	itemsContainer:SetSkinName("test_frame_midle");
+	itemsContainer:SetSkinName("None");
 	itemsContainer:RemoveAllChild();
 	itemsContainer:EnableHitTest(1);
 	itemsContainer:EnableScrollBar(1);
@@ -603,21 +603,33 @@ end
 
 local function CreateSearchControl(frame)
 
-	local searchGroup = tolua.cast(frame:CreateOrGetControl("groupbox", "searchgroup", 20, 973, 510, 38), "ui::CGroupBox");
+	local itemsSkinGroup = tolua.cast(frame:CreateOrGetControl("groupbox", "itemsskin", 10, 160, 530, 850), "ui::CGroupBox");
+	itemsSkinGroup:SetGravity(ui.LEFT, ui.TOP);
+	itemsSkinGroup:SetSkinName("test_frame_midle");
+	itemsSkinGroup:EnableHitTest(0);
+	itemsSkinGroup:EnableScrollBar(0);
+
+	local lineControl = frame:CreateOrGetControl("labelline", "searchline", 5, 955, 540, 4);
+	lineControl:SetGravity(ui.LEFT, ui.TOP);
+	lineControl:EnableHitTest(0);
+	lineControl:SetSkinName("None");
+
+	local searchGroup = tolua.cast(frame:CreateOrGetControl("groupbox", "searchgroup", 18, 964, 515, 38), "ui::CGroupBox");
 	searchGroup:SetGravity(ui.LEFT, ui.TOP);
 	searchGroup:EnableHitTest(1);
 	searchGroup:EnableScrollBar(0);
 	searchGroup:SetSkinName("test_weight_skin");
 
-	local searchEdit = tolua.cast(searchGroup:CreateOrGetControl("edit", "searchedit", 0, 0, 440, 24), "ui::CEditControl");
+	local searchEdit = tolua.cast(searchGroup:CreateOrGetControl("edit", "searchedit", 5, 5, 440, 26), "ui::CEditControl");
 	searchEdit:SetGravity(ui.LEFT, ui.TOP);
-	searchEdit:SetMargin(5, 5, 0, 0);
 	searchEdit:EnableHitTest(1);
 	searchEdit:SetSkinName("None");
 	searchEdit:SetClickSound("button_click_big");
 	searchEdit:SetOverSound("button_over");
 	searchEdit:SetFontName("white_18_ol");
 	searchEdit:SetMaxLen(50);
+	searchEdit:SetOffsetXForDraw(0);
+	searchEdit:SetOffsetYForDraw(-1);
 	searchEdit:SetTypingScp("ENHANCEDCOLLECTION_SEARCH");
 
 	local searchButton = tolua.cast(searchGroup:CreateOrGetControl("button", "searchbutton", 0, 0, 60, 38), "ui::CButton");
