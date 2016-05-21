@@ -122,15 +122,19 @@ end
 local function EnsureCollectionItemDetailCreated(itemControl, frame)
 
 	local detailControl = itemControl:GetChild("detail");
-	local heightBefore = detailControl ~= nil and detailControl:GetHeight() or 0;
-
-	detailControl = tolua.cast(itemControl:CreateOrGetControl("groupbox", "detail", 10, itemControl:GetHeight(), itemControl:GetWidth(), 0), "ui::CGroupBox");
-	detailControl:EnableHitTest(1);
-	detailControl:EnableScrollBar(0);
+	local heightBefore;
+	if detailControl ~= nil then
+		heightBefore = detailControl:GetHeight();
+	else
+		heightBefore = 0;
+		detailControl = tolua.cast(itemControl:CreateOrGetControl("groupbox", "detail", 20, itemControl:GetHeight(), itemControl:GetWidth() - 35, 0), "ui::CGroupBox");
+		detailControl:EnableHitTest(1);
+		detailControl:EnableScrollBar(0);
+	end
 
 	MAKE_DECK_DETAIL(frame, nil, itemControl, detailControl);
-
 	local heightOffset = detailControl:GetHeight() - heightBefore;
+
 	ResizeCollectionItemControl(itemControl, heightOffset);
 
 end
@@ -183,7 +187,7 @@ local function CreateCollectionItemControl(itemsContainer, collectionInfo, contr
 	buttonControl:SetGravity(ui.LEFT, ui.TOP);
 	buttonControl:SetSkinName("test_skin_01_btn");
 	buttonControl:EnableHitTest(1);
-	buttonControl:SetOverSound('button_over');
+	buttonControl:SetOverSound("button_over");
 	buttonControl:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_TOGGLE_DETAIL");
 	
 	local imageSize = 28;
@@ -290,8 +294,6 @@ end
 
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
-	--ui.SysMsg("Updating collection");
-
 	-- Hide the CCollection control: we're not using it because of the following issues:
 	--    - Scrolling doesn't correctly calculate hidden items when the detail is present.
 	--    - Resize doesn't invalidate the scrollbar.
@@ -306,26 +308,6 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	itemsContainer:RemoveAllChild();
 	itemsContainer:EnableHitTest(1);
 	itemsContainer:EnableScrollBar(1);
-
-	--collectionControl = tolua.cast(frame:CreateOrGetControl("collection", "enhancedcol", 0, 160, 530, 500), "ui::CCollection");
-	--collectionControl:RemoveAllChild();
-
---	collectionControl:EnableHitTest(1);
---	collectionControl:SetPos(collectionControl:GetX(), 160);
---	collectionControl:Resize(533, 800);
---	collectionControl:SetItemSpace(0, 0);
-
-	--local grid = tolua.cast(collectionControl, "ui::CGrid");
-	--
---	local file, err = io.open( '../addons/debug.txt', 'w' );
---	for key,value in pairs(getmetatable(detailView)) do
---		file:write( "!" .. key .. '\n' );
---	end
---	file:close();
-	
-	--collectionControl:ShowWindow(1);
-	--
-	
 
 	local width = 505;
 	local countWidth = 40;
@@ -369,10 +351,7 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	if addType ~= "UNEQUIP" and REMOVE_ITEM_SKILL ~= 7 then
 		imcSound.PlaySoundEvent("quest_ui_alarm_2");
 	end
-	
-	--collectionControl:UpdateItemList();
 
-	--ui.SysMsg("OK collec2!");
 end
 
 local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
@@ -380,9 +359,7 @@ local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
 	if itemsContainer ~= nil then
 		local currentDetailItemControl = GetCurrentDetailItemControl(frame, itemsContainer);
 		if currentDetailItemControl ~= nil then
-			--ui.SysMsg("BEFORE UPDATE DETAIL");
-			--EnsureCollectionItemDetailCreated(currentDetailItemControl, frame);
-			--ui.SysMsg("AFTER UPDATE DETAIL");
+			EnsureCollectionItemDetailCreated(currentDetailItemControl, frame);
 		end
 	end
 end
@@ -488,4 +465,4 @@ SETUP_HOOK(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 CreateFilters();
 CreateSortButtons();
 
-ui.SysMsg("Enhanced Collection v0.3 loaded!");
+ui.SysMsg("Enhanced Collection v1.0 loaded!");
