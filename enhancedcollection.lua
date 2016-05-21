@@ -180,7 +180,7 @@ function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemsContainer, itemControl)
 	imcSound.PlaySoundEvent("cllection_inven_open");
 
 	local detailControl = itemControl:GetChild("detail");
-	local frame = itemsContainer:GetParent():GetParent();
+	local frame = ui.GetFrame("collection");
 
 	if detailControl ~= nil then
 		EnsureCollectionItemDetailRemoved(itemControl, frame);
@@ -328,40 +328,42 @@ local function SortCollectionByStatus(x, y)
 	return x.name < y.name;
 end
 
+local function GetSearchText(itemsBgGroup)
+	local searchGroup = itemsBgGroup:GetChild("searchgroup");
+	if searchGroup ~= nil then
+		local searchEdit = searchGroup:GetChild("searchedit");
+		if searchEdit ~= nil then
+			local searchText = searchEdit:GetText();
+			if searchText ~= nil then
+				return string.lower(searchText);
+			end
+		end
+	end
+	return nil;
+end
+
 -- Updates the full collection list.
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
-	ui.SysMsg("addType=" .. (addType ~= nil and addType or "nil") .. "; removeType=" .. (removeType ~= nil and removeType or "nil"));
+	local itemsBgGroup = frame:GetChild("itemsbggroup");
+	if itemsBgGroup == nil then
+		return;
+	end
 
-	-- Hide the CCollection control: we're not using it because of the following issues:
-	--    - Scrolling doesn't correctly calculate hidden items when the detail is present.
-	--    - Resize doesn't invalidate the scrollbar.
-	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
-	collectionControl:RemoveAllChild();
-	collectionControl:EnableHitTest(0);
-	collectionControl:ShowWindow(0);
-
-	local itemsContainer = tolua.cast(frame:CreateOrGetControl("groupbox", "itemscontainer", 10, 160, 533, 797), "ui::CGroupBox");
-	itemsContainer:SetGravity(ui.LEFT, ui.TOP);
-	itemsContainer:SetSkinName("None");
+	local itemsContainer = itemsBgGroup:GetChild("itemscontainer");
+	if itemsContainer == nil then
+		return;
+	end
 	itemsContainer:RemoveAllChild();
-	itemsContainer:EnableHitTest(1);
-	itemsContainer:EnableScrollBar(1);
 
 	local width = 505;
-	local countWidth = 40;
 	local height = 40;
-	collectionControl:SetItemSize(width, height);
 
-	local collectionList, collectionCount = session.GetMySession():GetCollection();
+	local collectionList = session.GetMySession():GetCollection();
 	local collectionClassList, collectionClassCount = GetClassList("Collection");
 	local etcObject = GetMyEtcObject();
+	local searchText = GetSearchText(itemsBgGroup);
 
-	local searchText = frame:GetChild("searchgroup"):GetChild("searchedit"):GetText();
-	if searchText ~= nil then
-		searchText = string.lower(searchText);
-	end
-	
 	local collectionInfoList = {};
 	local collectionInfoIndex = 1;
 	for i = 0, collectionClassCount - 1 do
@@ -373,7 +375,7 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 			collectionInfoIndex = collectionInfoIndex + 1;
 		end
 	end
-	
+
 	if options.sortType == sortTypes.name then
 		table.sort(collectionInfoList, SortCollectionByName);
 	elseif options.sortType == sortTypes.status then
@@ -569,7 +571,7 @@ local function CreateFilter(frame, optionKey, text, y)
 
 end
 
-local function CreateFilters(frame)
+local function InitFilters(frame)
 	CreateFilter(frame, "showUnknownCollections", "Show {ol}{" .. colors.unknown .. "}unknown{/}{/} collections", 60);
 	CreateFilter(frame, "showCompleteCollections", "Show {img collection_com 24 24}{ol}{" .. colors.complete .. "}complete{/}{/} collections", 90);
 	CreateFilter(frame, "showIncompleteCollections", "Show {ol}{" .. colors.incomplete .. "}incomplete{/}{/} collections", 120);
@@ -606,7 +608,7 @@ local function CreateSortButton(frame, sortType, text, y)
 
 end
 
-local function CreateSortButtons(frame)
+local function InitSortButtons(frame)
 
 	local sortButton1 = CreateSortButton(frame, sortTypes.default, "Sort by game order", 60);
 
@@ -623,21 +625,17 @@ function ENHANCEDCOLLECTION_SEARCH()
 	UpdateAfterOptionChanged();
 end
 
-local function CreateSearchControl(frame)
+local function InitSearchControl(itemsBgGroup)
 
-	local itemsSkinGroup = tolua.cast(frame:CreateOrGetControl("groupbox", "itemsskin", 10, 160, 530, 850), "ui::CGroupBox");
-	itemsSkinGroup:SetGravity(ui.LEFT, ui.TOP);
-	itemsSkinGroup:SetSkinName("test_frame_midle");
-	itemsSkinGroup:EnableHitTest(0);
-	itemsSkinGroup:EnableScrollBar(0);
-
-	local lineControl = frame:CreateOrGetControl("labelline", "searchline", 5, 955, 540, 4);
-	lineControl:SetGravity(ui.LEFT, ui.TOP);
+	local lineControl = itemsBgGroup:CreateOrGetControl("labelline", "searchline", 0, 0, 535, 4);
+	lineControl:SetGravity(ui.LEFT, ui.BOTTOM);
+	lineControl:SetMargin(0, 0, 0, 50);
 	lineControl:EnableHitTest(0);
 	lineControl:SetSkinName("None");
 
-	local searchGroup = tolua.cast(frame:CreateOrGetControl("groupbox", "searchgroup", 18, 964, 515, 38), "ui::CGroupBox");
-	searchGroup:SetGravity(ui.LEFT, ui.TOP);
+	local searchGroup = tolua.cast(itemsBgGroup:CreateOrGetControl("groupbox", "searchgroup", 0, 0, 515, 38), "ui::CGroupBox");
+	searchGroup:SetGravity(ui.LEFT, ui.BOTTOM);
+	searchGroup:SetMargin(8, 0, 0, 7);
 	searchGroup:EnableHitTest(1);
 	searchGroup:EnableScrollBar(0);
 	searchGroup:SetSkinName("test_weight_skin");
@@ -667,11 +665,44 @@ local function CreateSearchControl(frame)
 
 end
 
+local function InitItemsControls(frame)
+
+	-- Hide the CCollection control: we're not using it because of the following issues:
+	--    - Scrolling doesn't correctly calculate hidden items when the detail is present.
+	--    - Resize doesn't invalidate the scrollbar.
+	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
+	collectionControl:RemoveAllChild();
+	collectionControl:EnableHitTest(0);
+	collectionControl:ShowWindow(0);
+
+	local itemsBgGroup = tolua.cast(frame:CreateOrGetControl("groupbox", "itemsbggroup", 0, 0, 530, 850), "ui::CGroupBox");
+	itemsBgGroup:SetGravity(ui.LEFT, ui.TOP);
+	itemsBgGroup:SetMargin(10, 160, 0, 0);
+	itemsBgGroup:SetSkinName("test_frame_midle");
+	itemsBgGroup:EnableHitTest(1);
+	itemsBgGroup:EnableScrollBar(0);
+	itemsBgGroup:EnableAutoResize(false, true);
+	itemsBgGroup:ShowWindow(1);
+
+	local itemsContainer = tolua.cast(itemsBgGroup:CreateOrGetControl("groupbox", "itemscontainer", 0, 0, 533, 797), "ui::CGroupBox");
+	itemsContainer:SetGravity(ui.LEFT, ui.TOP);
+	itemsContainer:SetSkinName("None");
+	itemsContainer:EnableHitTest(1);
+	itemsContainer:EnableScrollBar(1);
+	itemsContainer:ShowWindow(1);
+
+	InitSearchControl(itemsBgGroup);
+
+end
+
 local function Init()
 	local frame = ui.GetFrame("collection");
-	CreateFilters(frame);
-	CreateSortButtons(frame);
-	CreateSearchControl(frame);
+	InitFilters(frame);
+	InitSortButtons(frame);
+	InitItemsControls(frame);
+	if frame:IsVisible() then
+		UPDATE_COLLECTION_LIST(frame);
+	end
 end
 
 local function COLLECTION_FIRST_OPEN_HOOKED(frame)
