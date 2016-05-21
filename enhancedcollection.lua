@@ -136,7 +136,7 @@ local function EnsureCollectionItemDetailCreated(itemControl, frame, shouldPlayE
 	else
 		heightBefore = 0;
 		detailControl = tolua.cast(itemControl:CreateOrGetControl("groupbox", "detail", 17, itemControl:GetHeight() - 8, itemControl:GetWidth() - 35, 0), "ui::CGroupBox");
-		detailControl:SetSkinName(0);
+		detailControl:SetSkinName("None");
 		detailControl:EnableHitTest(1);
 		detailControl:EnableScrollBar(0);
 	end
@@ -197,22 +197,17 @@ local function MakeCountString(info)
 end
 
 local function CreateCollectionItemControl(itemsContainer, collectionInfo, controlName, y, width, height)
-	
---	local itemControl = tolua.cast(itemsContainer:CreateOrGetControl("controlset", controlName, 0, y, width, height), "ui::CControlSet");
---	itemControl:SetGravity(ui.LEFT, ui.TOP);
---	itemControl:EnableHitTest(1);
---	itemControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
 
-	local buttonControl = itemsContainer:CreateOrGetControl("button", controlName, 8, y, width - 8, height);
-	buttonControl:SetGravity(ui.LEFT, ui.TOP);
-	buttonControl:SetSkinName("test_skin_01_btn");
-	buttonControl:EnableHitTest(1);
-	buttonControl:SetOverSound("button_over");
-	buttonControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
-	buttonControl:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_TOGGLE_DETAIL");
+	local itemControl = itemsContainer:CreateOrGetControl("button", controlName, 8, y, width - 8, height);
+	itemControl:SetGravity(ui.LEFT, ui.TOP);
+	itemControl:SetSkinName("test_skin_01_btn");
+	itemControl:EnableHitTest(1);
+	itemControl:SetOverSound("button_over");
+	itemControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
+	itemControl:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_TOGGLE_DETAIL");
 
-	local titleControl = tolua.cast(buttonControl:CreateOrGetControl("controlset", "title", 0, 0, buttonControl:GetWidth(), buttonControl:GetHeight()), "ui::CControlSet");
-	buttonControl:SetGravity(ui.LEFT, ui.TOP);
+	local titleControl = tolua.cast(itemControl:CreateOrGetControl("controlset", "title", 0, 0, itemControl:GetWidth(), itemControl:GetHeight()), "ui::CControlSet");
+	itemControl:SetGravity(ui.LEFT, ui.TOP);
 	titleControl:EnableHitTest(0);
 
 	local imageSize = 28;
@@ -247,7 +242,7 @@ local function CreateCollectionItemControl(itemsContainer, collectionInfo, contr
 	countControl:EnableHitTest(0);
 	countControl:SetText("{ol}{" .. collectionInfo.color .. "} " .. countString);
 
-	return buttonControl;
+	return itemControl;
 
 end
 
@@ -258,6 +253,15 @@ local function PassesFilter(collectionInfo)
 		return options.showCompleteCollections;
 	else
 		return options.showIncompleteCollections;
+	end
+end
+
+local function PassesSearch(collectionInfo, searchText)
+	if searchText == nil or string.len(searchText) == 0 then
+		return true;
+	else
+		local collectionName = string.lower(collectionInfo.name);
+		return string.find(collectionName, searchText) ~= nil;
 	end
 end
 
@@ -323,7 +327,7 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	collectionControl:EnableHitTest(0);
 	collectionControl:ShowWindow(0);
 
-	local itemsContainer = tolua.cast(frame:CreateOrGetControl("groupbox", "itemscontainer", 10, 160, 530, 850), "ui::CGroupBox");
+	local itemsContainer = tolua.cast(frame:CreateOrGetControl("groupbox", "itemscontainer", 10, 160, 530, 800), "ui::CGroupBox");
 	itemsContainer:SetGravity(ui.LEFT, ui.TOP);
 	itemsContainer:SetSkinName("test_frame_midle");
 	itemsContainer:RemoveAllChild();
@@ -338,15 +342,19 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 	local collectionList, collectionCount = session.GetMySession():GetCollection();
 	local collectionClassList, collectionClassCount = GetClassList("Collection");
 	local etcObject = GetMyEtcObject();
+
+	local searchText = frame:GetChild("searchgroup"):GetChild("searchedit"):GetText();
+	if searchText ~= nil then
+		searchText = string.lower(searchText);
+	end
 	
 	local collectionInfoList = {};
-	
 	local collectionInfoIndex = 1;
 	for i = 0, collectionClassCount - 1 do
 		local collectionClass = GetClassByIndexFromList(collectionClassList, i);
 		local collection = collectionList:Get(collectionClass.ClassID);
 		local collectionInfo = CreateCollectionInfo(collectionClass, collection, etcObject);
-		if PassesFilter(collectionInfo) then
+		if PassesFilter(collectionInfo) and PassesSearch(collectionInfo, searchText) then
 			collectionInfoList[collectionInfoIndex] = collectionInfo;
 			collectionInfoIndex = collectionInfoIndex + 1;
 		end
@@ -403,7 +411,6 @@ local function CreateDetailItemControl(detailControl, itemClass, collectionClass
 	local height = 48;
 
 	local itemControl = tolua.cast(detailControl:CreateOrGetControl("controlset", controlName, 0, y, width, height), "ui::CControlSet");
-	--itemControl:SetSkinName("labelbox");
 
 	local slot = tolua.cast(itemControl:CreateOrGetControl("slot", "slot", 0, 0, 48, height), "ui::CSlot");
 	local isKnownCollection = collection ~= nil;
@@ -508,10 +515,8 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect
 
 end
 
-local function UpdateAfterOptionChanged(frame)
-	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
-	collectionControl:HideDetailView();
-	UPDATE_COLLECTION_LIST(frame);
+local function UpdateAfterOptionChanged()
+	UPDATE_COLLECTION_LIST(ui.GetFrame("collection"));
 end
 
 local function GetConfigKey(optionKey)
@@ -524,9 +529,9 @@ local function CreateFilter(frame, optionKey, text, y)
 	options[optionKey] = config.GetConfigInt(configKey, options[optionKey] and 1 or 0) ~= 0;
 	
 	local eventScriptName = "ENHANCEDCOLLECTION_TOGGLE_" .. optionKey;
-	_G[eventScriptName] = function(frame, checkBox)
+	_G[eventScriptName] = function(parent, checkBox)
 		options[optionKey] = checkBox:IsChecked() == 1;
-		UpdateAfterOptionChanged(frame);
+		UpdateAfterOptionChanged();
 		config.SetConfig(configKey, options[optionKey] and 1 or 0);
 	end
 
@@ -542,8 +547,7 @@ local function CreateFilter(frame, optionKey, text, y)
 
 end
 
-local function CreateFilters()
-	local frame = ui.GetFrame("collection");
+local function CreateFilters(frame)
 	CreateFilter(frame, "showUnknownCollections", "Show {ol}{" .. colors.unknown .. "}unknown{/}{/} collections", 60);
 	CreateFilter(frame, "showCompleteCollections", "Show {img collection_com 24 24}{ol}{" .. colors.complete .. "}complete{/}{/} collections", 90);
 	CreateFilter(frame, "showIncompleteCollections", "Show {ol}{" .. colors.incomplete .. "}incomplete{/}{/} collections", 120);
@@ -555,10 +559,10 @@ local function CreateSortButton(frame, sortType, text, y)
 	options.sortType = config.GetConfigInt(configKey, options.sortType);
 
 	local eventScriptName = "ENHANCEDCOLLECTION_SETSORT_" .. sortType;
-	_G[eventScriptName] = function(frame, radioButton)
+	_G[eventScriptName] = function(parent, radioButton)
 		if radioButton:IsChecked() then
 			options.sortType = sortType;
-			UpdateAfterOptionChanged(frame);
+			UpdateAfterOptionChanged();
 			config.SetConfig(configKey, options.sortType);
 		end
 	end
@@ -580,8 +584,7 @@ local function CreateSortButton(frame, sortType, text, y)
 
 end
 
-local function CreateSortButtons()
-	local frame = ui.GetFrame("collection");
+local function CreateSortButtons(frame)
 
 	local sortButton1 = CreateSortButton(frame, sortTypes.default, "Sort by game order", 60);
 
@@ -594,10 +597,52 @@ local function CreateSortButtons()
 
 end
 
+function ENHANCEDCOLLECTION_SEARCH()
+	UpdateAfterOptionChanged();
+end
+
+local function CreateSearchControl(frame)
+
+	local searchGroup = tolua.cast(frame:CreateOrGetControl("groupbox", "searchgroup", 20, 973, 510, 38), "ui::CGroupBox");
+	searchGroup:SetGravity(ui.LEFT, ui.TOP);
+	searchGroup:EnableHitTest(1);
+	searchGroup:EnableScrollBar(0);
+	searchGroup:SetSkinName("test_weight_skin");
+
+	local searchEdit = tolua.cast(searchGroup:CreateOrGetControl("edit", "searchedit", 0, 0, 440, 24), "ui::CEditControl");
+	searchEdit:SetGravity(ui.LEFT, ui.TOP);
+	searchEdit:SetMargin(5, 5, 0, 0);
+	searchEdit:EnableHitTest(1);
+	searchEdit:SetSkinName("None");
+	searchEdit:SetClickSound("button_click_big");
+	searchEdit:SetOverSound("button_over");
+	searchEdit:SetFontName("white_18_ol");
+	searchEdit:SetMaxLen(50);
+	searchEdit:SetTypingScp("ENHANCEDCOLLECTION_SEARCH");
+
+	local searchButton = tolua.cast(searchGroup:CreateOrGetControl("button", "searchbutton", 0, 0, 60, 38), "ui::CButton");
+	searchButton:SetGravity(ui.RIGHT, ui.TOP);
+	searchButton:SetMargin(0, 2, 3, 0);
+	searchButton:EnableHitTest(1);
+	searchButton:SetAnimation("MouseOnAnim", "btn_mouseover");
+	searchButton:SetAnimation("MouseOffAnim", "btn_mouseoff");
+	searchButton:SetClickSound("button_click_big");
+	searchButton:SetOverSound("button_over");
+	searchButton:SetImage("inven_s");
+	searchButton:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_SEARCH");
+
+end
+
+local function Init()
+	local frame = ui.GetFrame("collection");
+	CreateFilters(frame);
+	CreateSortButtons(frame);
+	CreateSearchControl(frame);
+end
+
 local function COLLECTION_FIRST_OPEN_HOOKED(frame)
 	GET_CHILD(frame, "showoption", "ui::CDropList"):ShowWindow(0);
-	CreateFilters();
-	CreateSortButtons();
+	Init();
 	UPDATE_COLLECTION_LIST(frame);
 end
 
@@ -606,8 +651,6 @@ SETUP_HOOK(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
 SETUP_HOOK(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
 SETUP_HOOK(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 
-
-CreateFilters();
-CreateSortButtons();
+Init();
 
 ui.SysMsg("Enhanced Collection v1.0 loaded!");
