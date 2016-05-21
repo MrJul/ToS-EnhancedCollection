@@ -100,9 +100,81 @@ local function CreateCollectionInfo(collectionClass, collection, etcObject)
 	};
 end
 
-local function CreateCollectionItemControl(collectionControl, collectionInfo, controlName, width, height)
+local function GetItemControlName(collectionClassID)
+	return "DECKEX_" .. collectionClassID;
+end
+
+local function ResizeCollectionItemControl(itemControl, heightOffset)
+	if heightOffset == 0 then
+		return;
+	end
+
+	itemControl:Resize(itemControl:GetWidth(), itemControl:GetHeight() + heightOffset);
+
+	local itemsContainer = itemControl:GetParent();
+	local itemIndex = itemsContainer:GetChildIndexByObj(itemControl);
+	for i = itemIndex + 1, itemsContainer:GetChildCount() - 1 do
+		local child = itemsContainer:GetChildByIndex(i);
+		child:Move(0, heightOffset);
+	end
+end
+
+local function EnsureCollectionItemDetailCreated(itemControl, frame)
+
+	local detailControl = itemControl:GetChild("detail");
+	local heightBefore = detailControl ~= nil and detailControl:GetHeight() or 0;
+
+	detailControl = tolua.cast(itemControl:CreateOrGetControl("groupbox", "detail", 10, itemControl:GetHeight(), itemControl:GetWidth(), 0), "ui::CGroupBox");
+	detailControl:EnableHitTest(1);
+	detailControl:EnableScrollBar(0);
+
+	MAKE_DECK_DETAIL(frame, nil, itemControl, detailControl);
+
+	local heightOffset = detailControl:GetHeight() - heightBefore;
+	ResizeCollectionItemControl(itemControl, heightOffset);
+
+end
+
+local function EnsureCollectionItemDetailRemoved(itemControl, frame)
+	local detailControl = itemControl:GetChild("detail");
+	if detailControl ~= nil then
+		local detailHeight = detailControl:GetHeight();
+		itemControl:RemoveChild("detail");
+		frame:SetUserValue("DETAIL_VIEW_TYPE", nil);
+		ResizeCollectionItemControl(itemControl, -detailHeight);
+	end
+end
+
+local function GetCurrentDetailItemControl(frame, itemsContainer)
+	local currentDetailCollectionClassID = frame:GetUserIValue("DETAIL_VIEW_TYPE");
+	if currentDetailCollectionClassID ~= nil then
+		return itemsContainer:GetChild(GetItemControlName(currentDetailCollectionClassID));
+	else
+		return nil;
+	end
+end
+
+function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemControl)
+	imcSound.PlaySoundEvent("cllection_inven_open");
+
+	local detailControl = itemControl:GetChild("detail");
+	local itemsContainer = itemControl:GetParent();
+	local frame = itemsContainer:GetParent():GetParent();
+
+	if detailControl ~= nil then
+		EnsureCollectionItemDetailRemoved(itemControl, frame);
+	else
+		local currentDetailItemControl = GetCurrentDetailItemControl(frame, itemsContainer);
+		if currentDetailItemControl ~= nil then
+			EnsureCollectionItemDetailRemoved(currentDetailItemControl, frame);
+		end
+		EnsureCollectionItemDetailCreated(itemControl, frame);
+	end
+end
+
+local function CreateCollectionItemControl(itemsContainer, collectionInfo, controlName, y, width, height)
 	
-	local itemControl = tolua.cast(collectionControl:CreateOrGetControl("controlset", controlName, 0, 0, width, height), "ui::CControlSet");
+	local itemControl = tolua.cast(itemsContainer:CreateOrGetControl("controlset", controlName, 0, y, width, height), "ui::CControlSet");
 	itemControl:SetGravity(ui.LEFT, ui.TOP);
 	itemControl:EnableHitTest(1);
 	itemControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
@@ -112,7 +184,7 @@ local function CreateCollectionItemControl(collectionControl, collectionInfo, co
 	buttonControl:SetSkinName("test_skin_01_btn");
 	buttonControl:EnableHitTest(1);
 	buttonControl:SetOverSound('button_over');
-	buttonControl:SetEventScript(ui.LBUTTONUP, "OPEN_DECK_DETAIL");
+	buttonControl:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_TOGGLE_DETAIL");
 	
 	local imageSize = 28;
 	local imageMarginLeft = 8;
@@ -149,6 +221,8 @@ local function CreateCollectionItemControl(collectionControl, collectionInfo, co
 	countControl:SetGravity(ui.RIGHT, ui.CENTER_VERT);
 	countControl:EnableHitTest(0);
 	countControl:SetText("{ol}{" .. collectionInfo.color .. "} " .. countString);
+
+	return itemControl;
 
 end
 
@@ -216,31 +290,52 @@ end
 
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
-	ui.SysMsg("Updating collection");
+	--ui.SysMsg("Updating collection");
 
+	-- Hide the CCollection control: we're not using it because of the following issues:
+	--    - Scrolling doesn't correctly calculate hidden items when the detail is present.
+	--    - Resize doesn't invalidate the scrollbar.
 	local collectionControl = GET_CHILD(frame, "col", "ui::CCollection");
 	collectionControl:RemoveAllChild();
-	collectionControl:EnableHitTest(1);
-	collectionControl:SetPos(collectionControl:GetX(), 160);
-	collectionControl:Resize(533, 800);
-	collectionControl:SetItemSpace(0, 0);
+	collectionControl:EnableHitTest(0);
+	collectionControl:ShowWindow(0);
 
-	local bgControl = tolua.cast(frame:CreateOrGetControl("groupbox", "itemsbg", collectionControl:GetX(), collectionControl:GetY(), 530, 850), "ui::CGroupBox");
-	bgControl:SetGravity(ui.LEFT, ui.TOP);
-	bgControl:SetSkinName("test_frame_midle");
-	bgControl:EnableHitTest(0);
-	bgControl:EnableScrollBar(0);
-	frame:MoveChildBefore(bgControl, frame:GetChildIndex("col"));
+	local itemsContainer = tolua.cast(frame:CreateOrGetControl("groupbox", "itemscontainer", 10, 160, 530, 850), "ui::CGroupBox");
+	itemsContainer:SetGravity(ui.LEFT, ui.TOP);
+	itemsContainer:SetSkinName("test_frame_midle");
+	itemsContainer:RemoveAllChild();
+	itemsContainer:EnableHitTest(1);
+	itemsContainer:EnableScrollBar(1);
+
+	--collectionControl = tolua.cast(frame:CreateOrGetControl("collection", "enhancedcol", 0, 160, 530, 500), "ui::CCollection");
+	--collectionControl:RemoveAllChild();
+
+--	collectionControl:EnableHitTest(1);
+--	collectionControl:SetPos(collectionControl:GetX(), 160);
+--	collectionControl:Resize(533, 800);
+--	collectionControl:SetItemSpace(0, 0);
+
+	--local grid = tolua.cast(collectionControl, "ui::CGrid");
+	--
+--	local file, err = io.open( '../addons/debug.txt', 'w' );
+--	for key,value in pairs(getmetatable(detailView)) do
+--		file:write( "!" .. key .. '\n' );
+--	end
+--	file:close();
 	
+	--collectionControl:ShowWindow(1);
+	--
+	
+
 	local width = 505;
 	local countWidth = 40;
 	local height = 40;
 	collectionControl:SetItemSize(width, height);
-	
+
 	local collectionList, collectionCount = session.GetMySession():GetCollection();
 	local collectionClassList, collectionClassCount = GetClassList("Collection");
 	local etcObject = GetMyEtcObject();
-
+	
 	local collectionInfoList = {};
 	
 	local collectionInfoIndex = 1;
@@ -253,24 +348,43 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 			collectionInfoIndex = collectionInfoIndex + 1;
 		end
 	end
-
+	
 	if options.sortType == sortTypes.name then
 		table.sort(collectionInfoList, SortCollectionByName);
 	elseif options.sortType == sortTypes.status then
 		table.sort(collectionInfoList, SortCollectionByStatus);
 	end
 
+	local detailCollectionClassID = frame:GetUserIValue("DETAIL_VIEW_TYPE");
+	local y = 10;
 	for index, collectionInfo in ipairs(collectionInfoList) do
-		CreateCollectionItemControl(collectionControl, collectionInfo, "DECKEX_" .. index, width, height);
+		local itemControlName = GetItemControlName(collectionInfo.classID);
+		local itemControl = CreateCollectionItemControl(itemsContainer, collectionInfo, itemControlName, y, width, height, showDetail);
+		if detailCollectionClassID == collectionInfo.classID then
+			EnsureCollectionItemDetailCreated(itemControl, frame);
+		end
+		y = y + itemControl:GetHeight();
 	end
 	
 	if addType ~= "UNEQUIP" and REMOVE_ITEM_SKILL ~= 7 then
 		imcSound.PlaySoundEvent("quest_ui_alarm_2");
 	end
+	
+	--collectionControl:UpdateItemList();
 
-	collectionControl:UpdateItemList();
+	--ui.SysMsg("OK collec2!");
+end
 
-	ui.SysMsg("OK collec2!");
+local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
+	local itemsContainer = GET_CHILD(frame, "itemscontainer", "ui::CGroupBox");
+	if itemsContainer ~= nil then
+		local currentDetailItemControl = GetCurrentDetailItemControl(frame, itemsContainer);
+		if currentDetailItemControl ~= nil then
+			--ui.SysMsg("BEFORE UPDATE DETAIL");
+			--EnsureCollectionItemDetailCreated(currentDetailItemControl, frame);
+			--ui.SysMsg("AFTER UPDATE DETAIL");
+		end
+	end
 end
 
 local function UpdateAfterOptionChanged(frame)
@@ -314,7 +428,7 @@ local function CreateFilters()
 	CreateFilter(frame, "showIncompleteCollections", "Show {ol}{" .. colors.incomplete .. "}incomplete{/}{/} collections", 120);
 end
 
-local function CreateSortButton(frame, sortType, text, y, radioGroup)
+local function CreateSortButton(frame, sortType, text, y)
 
 	local configKey = GetConfigKey("sortType");
 	options.sortType = config.GetConfigInt(configKey, options.sortType);
@@ -337,10 +451,6 @@ local function CreateSortButton(frame, sortType, text, y, radioGroup)
 	radioButton:SetOverSound("button_over");
 	radioButton:SetEventScript(ui.LBUTTONUP, eventScriptName);
 
-	if radioGroup ~= nil then
-		radioButton:AddToGroup(radioGroup);
-	end
-	
 	if options.sortType == sortType then
 		radioButton:Select();
 	end
@@ -351,12 +461,19 @@ end
 
 local function CreateSortButtons()
 	local frame = ui.GetFrame("collection");
-	local radioGroup = CreateSortButton(frame, sortTypes.default, "Sort by game order", 60);
-	CreateSortButton(frame, sortTypes.name, "Sort by name", 90, radioGroup);
-	CreateSortButton(frame, sortTypes.status, "Sort by status", 120, radioGroup);
+
+	local sortButton1 = CreateSortButton(frame, sortTypes.default, "Sort by game order", 60);
+
+	local sortButton2 = CreateSortButton(frame, sortTypes.name, "Sort by name", 90);
+	sortButton2:AddToGroup(sortButton1);
+
+	local sortButton3 = CreateSortButton(frame, sortTypes.status, "Sort by status", 120, radioGroup);
+	sortButton3:AddToGroup(sortButton1);
+	sortButton3:AddToGroup(sortButton2);
+
 end
 
-function COLLECTION_FIRST_OPEN_HOOKED(frame)
+local function COLLECTION_FIRST_OPEN_HOOKED(frame)
 	GET_CHILD(frame, "showoption", "ui::CDropList"):ShowWindow(0);
 	CreateFilters();
 	CreateSortButtons();
@@ -364,7 +481,9 @@ function COLLECTION_FIRST_OPEN_HOOKED(frame)
 end
 
 SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
+SETUP_HOOK(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
 SETUP_HOOK(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
+
 
 CreateFilters();
 CreateSortButtons();
