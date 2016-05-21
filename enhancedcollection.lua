@@ -31,7 +31,7 @@ local statuses = {
 
 local function TrimWithEllipsis(value, maxLength)
 	if string.len(value) > maxLength then
-		return string.sub(value, 1, maxLength) .. "..."
+		return string.sub(value, 1, maxLength - 3) .. "..."
 	else
 		return value;
 	end
@@ -47,25 +47,32 @@ local function GetCollectionColor(isUnknown, isComplete)
 	end
 end
 
-local function GetUsefulItemInventoryCount(itemClass, collection, geCollection)
+local function GetItemInfo(itemClass, collection, geCollection)
+	local itemInfo = {
+		neededCount = 0,
+		currentCount = 0,
+		usefulInventoryCount = 0
+	};
+
 	if itemClass == nil then
-		return 0;
+		return itemInfo;
 	end
 
-	local neededItemCount = geCollection:GetNeedItemCount(itemClass.ClassID);
-	local collectionItemCount = collection and collection:GetItemCountByType(itemClass.ClassID) or 0;
+	itemInfo.neededCount = geCollection:GetNeedItemCount(itemClass.ClassID);
+	itemInfo.currentCount = collection and collection:GetItemCountByType(itemClass.ClassID) or 0;
+
 	local inventoryItemCount = session.GetInvItemCountByType(itemClass.ClassID);
-	
-	local missingItemCount = neededItemCount - collectionItemCount;
-	if missingItemCount <= 0 then
-		return 0;
+	local missingItemCount = itemInfo.neededCount - itemInfo.currentCount;
+
+	if missingItemCount > 0 then
+		if inventoryItemCount >= missingItemCount then
+			itemInfo.usefulInventoryCount = missingItemCount;
+		else
+			itemInfo.usefulInventoryCount = inventoryItemCount;
+		end
 	end
 
-	if inventoryItemCount >= missingItemCount then
-		return missingItemCount;
-	else
-		return inventoryItemCount;
-	end
+	return itemInfo;
 end
 
 local function GetUsefulItemsInventoryCount(collectionClass, collection, geCollection)
@@ -75,7 +82,8 @@ local function GetUsefulItemsInventoryCount(collectionClass, collection, geColle
 		if itemName == "None" then
 			break;
 		end
-		usefulItemCount = usefulItemCount + GetUsefulItemInventoryCount(GetClass("Item", itemName), collection, geCollection);
+		local itemInfo = GetItemInfo(GetClass("Item", itemName), collection, geCollection);
+		usefulItemCount = usefulItemCount + itemInfo.usefulInventoryCount;
 	end
 	return usefulItemCount;
 end
@@ -83,16 +91,16 @@ end
 local function CreateCollectionInfo(collectionClass, collection, etcObject)
 	local geCollection = geCollectionTable.Get(collectionClass.ClassID);
 	local currentCount = collection ~= nil and collection:GetItemCount() or 0;
-	local maxCount = geCollection:GetTotalItemCount();
+	local neededCount = geCollection:GetTotalItemCount();
 	local isUnknown = collection == nil;
-	local isComplete = currentCount >= maxCount;
+	local isComplete = currentCount >= neededCount;
 	
 	return {
 		name = dictionary.ReplaceDicIDInCompStr(collectionClass.Name),
 		classID = collectionClass.ClassID,
 		currentCount = currentCount,
-		maxCount = maxCount,
-		inventoryCount = GetUsefulItemsInventoryCount(collectionClass, collection, geCollection),
+		neededCount = neededCount,
+		usefulInventoryCount = GetUsefulItemsInventoryCount(collectionClass, collection, geCollection),
 		isUnknown = isUnknown,
 		isComplete = isComplete,
 		isNew = etcObject["CollectionRead_" .. collectionClass.ClassID] == 0,
@@ -108,6 +116,8 @@ local function ResizeCollectionItemControl(itemControl, heightOffset)
 	if heightOffset == 0 then
 		return;
 	end
+
+	ui.SysMsg("resizing " .. itemControl:GetName() .. " to " .. heightOffset);
 
 	itemControl:Resize(itemControl:GetWidth(), itemControl:GetHeight() + heightOffset);
 
@@ -127,10 +137,13 @@ local function EnsureCollectionItemDetailCreated(itemControl, frame)
 		heightBefore = detailControl:GetHeight();
 	else
 		heightBefore = 0;
-		detailControl = tolua.cast(itemControl:CreateOrGetControl("groupbox", "detail", 20, itemControl:GetHeight(), itemControl:GetWidth() - 35, 0), "ui::CGroupBox");
+		detailControl = tolua.cast(itemControl:CreateOrGetControl("groupbox", "detail", 17, itemControl:GetHeight() - 8, itemControl:GetWidth() - 35, 0), "ui::CGroupBox");
+		detailControl:SetSkinName(0);
 		detailControl:EnableHitTest(1);
 		detailControl:EnableScrollBar(0);
 	end
+
+	ui.SysMsg("making detail");
 
 	MAKE_DECK_DETAIL(frame, nil, itemControl, detailControl);
 	local heightOffset = detailControl:GetHeight() - heightBefore;
@@ -158,12 +171,15 @@ local function GetCurrentDetailItemControl(frame, itemsContainer)
 	end
 end
 
-function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemControl)
+function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemsContainer, itemControl)
 	imcSound.PlaySoundEvent("cllection_inven_open");
 
 	local detailControl = itemControl:GetChild("detail");
-	local itemsContainer = itemControl:GetParent();
 	local frame = itemsContainer:GetParent():GetParent();
+	--local itemsContainer = itemControl:GetParent();
+	ui.SysMsg("itemControl=" .. itemControl:GetName());
+	ui.SysMsg("itemsContainer=" .. itemsContainer:GetName());
+	ui.SysMsg("frame=" .. frame:GetName());
 
 	if detailControl ~= nil then
 		EnsureCollectionItemDetailRemoved(itemControl, frame);
@@ -176,26 +192,40 @@ function ENHANCEDCOLLECTION_TOGGLE_DETAIL(itemControl)
 	end
 end
 
+local function MakeCountString(info)
+	local countString = info.currentCount .. " ";
+	if info.usefulInventoryCount > 0 then
+		countString = countString .. "{#1E90FF}(+" .. info.usefulInventoryCount .. "){/} ";
+	end
+	countString = countString .. "/ " .. info.neededCount;
+	return countString;
+end
+
 local function CreateCollectionItemControl(itemsContainer, collectionInfo, controlName, y, width, height)
 	
-	local itemControl = tolua.cast(itemsContainer:CreateOrGetControl("controlset", controlName, 0, y, width, height), "ui::CControlSet");
-	itemControl:SetGravity(ui.LEFT, ui.TOP);
-	itemControl:EnableHitTest(1);
-	itemControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
-	
-	local buttonControl = itemControl:CreateOrGetControl("button", "button", 8, 0, width - 8, height);
+--	local itemControl = tolua.cast(itemsContainer:CreateOrGetControl("controlset", controlName, 0, y, width, height), "ui::CControlSet");
+--	itemControl:SetGravity(ui.LEFT, ui.TOP);
+--	itemControl:EnableHitTest(1);
+--	itemControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
+
+	local buttonControl = itemsContainer:CreateOrGetControl("button", controlName, 8, y, width - 8, height);
 	buttonControl:SetGravity(ui.LEFT, ui.TOP);
 	buttonControl:SetSkinName("test_skin_01_btn");
 	buttonControl:EnableHitTest(1);
 	buttonControl:SetOverSound("button_over");
+	buttonControl:SetUserValue("COLLECTION_TYPE", collectionInfo.classID);
 	buttonControl:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_TOGGLE_DETAIL");
-	
+
+	local titleControl = tolua.cast(buttonControl:CreateOrGetControl("controlset", "title", 0, 0, buttonControl:GetWidth(), buttonControl:GetHeight()), "ui::CControlSet");
+	buttonControl:SetGravity(ui.LEFT, ui.TOP);
+	titleControl:EnableHitTest(0);
+
 	local imageSize = 28;
 	local imageMarginLeft = 8;
 	local imageMarginRight = 2;
 	local left = imageMarginLeft;
 
-	local completionControl = tolua.cast(buttonControl:CreateOrGetControl("picture", "completion", left, 0, imageSize, imageSize), "ui::CPicture");
+	local completionControl = tolua.cast(titleControl:CreateOrGetControl("picture", "completion", left, 0, imageSize, imageSize), "ui::CPicture");
 	completionControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
 	completionControl:EnableHitTest(0);
 	completionControl:SetEnableStretch(1);
@@ -209,24 +239,20 @@ local function CreateCollectionItemControl(itemsContainer, collectionInfo, contr
 	local countControlWidth = 90;
 	local textMargin = 10;
 	local nameWidth = width - left - countControlWidth - textMargin * 2;
-	local nameControl = buttonControl:CreateOrGetControl("richtext", "name", left, 0, nameWidth, height);
+	local nameControl = titleControl:CreateOrGetControl("richtext", "name", left, 0, nameWidth, height);
 	nameControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
 	nameControl:EnableHitTest(0);
 	nameControl:SetText("{ol}{ds}{" .. collectionInfo.color .. "}" .. TrimWithEllipsis(collectionInfo.name, 50));
 	left = left + nameWidth;
 		
-	local countControl = buttonControl:CreateOrGetControl("richtext", "count", left, 0, countControlWidth, height);
-	local countString = collectionInfo.currentCount .. " ";
-	if collectionInfo.inventoryCount > 0 then
-		countString = countString .. "{#1E90FF}(+" .. collectionInfo.inventoryCount .. "){/} ";
-	end
-	countString = countString .. "/ " .. collectionInfo.maxCount;
-	countControl:SetMargin(textMargin, 0, textMargin, 0);
+	local countControl = titleControl:CreateOrGetControl("richtext", "count", left, 0, countControlWidth, height);
+	local countString = MakeCountString(collectionInfo);
+	countControl:SetMargin(textMargin, 0, textMargin + 5, 0);
 	countControl:SetGravity(ui.RIGHT, ui.CENTER_VERT);
 	countControl:EnableHitTest(0);
 	countControl:SetText("{ol}{" .. collectionInfo.color .. "} " .. countString);
 
-	return itemControl;
+	return buttonControl;
 
 end
 
@@ -242,7 +268,7 @@ end
 
 local function GetStatus(collectionInfo)
 
-	if collectionInfo.inventoryCount > 0 then
+	if collectionInfo.usefulInventoryCount > 0 then
 		if collectionInfo.isUnknown then
 			if collectionInfo.isNew then
 				return statuses.unknownNewWithInventoryItems;
@@ -293,6 +319,8 @@ local function SortCollectionByStatus(x, y)
 end
 
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
+
+	ui.SysMsg("Updating collection...");
 
 	-- Hide the CCollection control: we're not using it because of the following issues:
 	--    - Scrolling doesn't correctly calculate hidden items when the detail is present.
@@ -352,6 +380,8 @@ local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 		imcSound.PlaySoundEvent("quest_ui_alarm_2");
 	end
 
+	ui.SysMsg("Collection updated.");
+
 end
 
 local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
@@ -362,6 +392,99 @@ local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
 			EnsureCollectionItemDetailCreated(currentDetailItemControl, frame);
 		end
 	end
+end
+
+local function GetDetailItemIconColorTone(itemInfo)
+	if itemInfo.currentCount >= itemInfo.neededCount then
+		return "FFFFFFFF";
+	elseif itemInfo.usefulInventoryCount > 0 then
+		return "80000000";
+	else
+		return "80000000";
+	end
+end
+
+
+local function CreateDetailItemControl(detailControl, itemClass, collectionClass, collection, geCollection, controlName, y)
+
+	local itemInfo = GetItemInfo(itemClass, collection, geCollection);
+
+	local width = detailControl:GetWidth();
+	local height = 48;
+
+	local itemControl = tolua.cast(detailControl:CreateOrGetControl("controlset", controlName, 0, y, width, height), "ui::CControlSet");
+	--itemControl:SetSkinName("labelbox");
+
+	local slot = tolua.cast(itemControl:CreateOrGetControl("slot", "slot", 0, 0, 48, height), "ui::CSlot");
+	local isSlotEnabled = (collection ~= nil) and (itemInfo.currentCount > itemInfo.neededCount or itemInfo.usefulInventoryCount > 0);
+	slot:SetGravity(ui.LEFT, ui.CENTER_VERT);
+	slot:SetSkinName("invenslot2");
+	slot:EnableDrag(0);
+	slot:EnableHitTest(isSlotEnabled and 1 or 0);
+	slot:SetOverSound("button_cursor_over_2");
+	slot:SetUserValue("COLLECTION_TYPE", collectionClass.ClassID);
+	slot:SetColorTone(isSlotEnabled and "FFFFFFFF" or "00FFFFFF");
+
+	local icon = CreateIcon(slot);
+	icon:SetImage(itemClass.Icon);
+	icon:SetColorTone(GetDetailItemIconColorTone(itemInfo));
+
+	local nameControl = itemControl:CreateOrGetControl("richtext", "name", 64, 0, width - 90 - 64, height);
+	nameControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
+	nameControl:EnableHitTest(0);
+	nameControl:SetText(GET_FULL_NAME(itemClass));
+
+	local countControl = itemControl:CreateOrGetControl("richtext", "count", 0, 0, width, height);
+	local countString = MakeCountString(itemInfo);
+	local color = GetCollectionColor(collection == nil, itemInfo.currentCount >= itemInfo.neededCount);
+	countControl:SetMargin(10, 0, 0, 0);
+	countControl:SetGravity(ui.RIGHT, ui.CENTER_VERT);
+	countControl:EnableHitTest(0);
+	countControl:SetText("{ol}{" .. color .. "}" .. countString);
+
+	SET_ITEM_TOOLTIP_ALL_TYPE(itemControl, itemData, itemClass.ClassName, "collection", collectionClass.ClassID, itemClass.ClassID);
+	SET_ITEM_TOOLTIP_ALL_TYPE(icon, itemData, itemClass.ClassName, "collection", collectionClass.ClassID, itemClass.ClassID);
+
+	return itemControl;
+end
+
+local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, playEffect)
+
+	detailControl:SetUserValue("CURRENT_TYPE", type);
+	detailControl:RemoveAllChild();
+	--detailControl:SetSkinName("rank_two_skin");
+	detailControl:EnableHitTest(1);
+	detailControl:EnableScrollBar(0);
+
+	ui.SysMsg("detailControl=" .. tolua.type(detailControl));
+
+	local line = detailControl:CreateOrGetControl("labelline", "line", 0, 0, detailControl:GetWidth(), 10);
+	line:SetSkinName("labelline_def_2");
+
+	local collectionClass = GetClassByType("Collection", type);
+	local collection = session.GetMySession():GetCollection():Get(collectionClass.ClassID);
+	local geCollection = geCollectionTable.Get(collectionClass.ClassID);
+
+	local y = 20;
+	local handledItemClasses = {}; -- avoid duplicates (appears in Bellai Rainforest collection)
+
+	for i = 1, 9 do
+		local itemName = collectionClass["ItemName_" .. i];
+		if itemName == "None" then
+			break;
+		end
+
+		local itemClass = GetClass("Item", itemName);
+		if handledItemClasses[itemClass.ClassID] ~= true then
+			handledItemClasses[itemClass.ClassID] = true;
+			local detailItemControl = CreateDetailItemControl(detailControl, itemClass, collectionClass, collection, geCollection, "IMGEX_" .. i, y);
+			y = y + detailItemControl:GetHeight() + 8;
+		end
+
+	end
+
+	detailControl:Resize(detailControl:GetWidth(), y);
+
 end
 
 local function UpdateAfterOptionChanged(frame)
@@ -459,6 +582,7 @@ end
 
 SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
 SETUP_HOOK(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
+SETUP_HOOK(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
 SETUP_HOOK(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 
 
