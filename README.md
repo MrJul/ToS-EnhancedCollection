@@ -15,7 +15,7 @@ This is an add-on for the game Tree of Savior that revamps the collection window
 
 ## Installation
 
-1. Download either [Excrulon's Lua Mods](https://github.com/Excrulon/Tree-of-Savior-Lua-Mods) or [fiote's cwLibrary](https://github.com/fiote/treeofsavior-addons).
+1. Download and install either [Excrulon's Lua Mods](https://github.com/Excrulon/Tree-of-Savior-Lua-Mods) or [fiote's cwLibrary](https://github.com/fiote/treeofsavior-addons).
 2. Download the [latest release of Enhanced Collection](https://github.com/MrJul/ToS-EnhancedCollection/releases).
 3. Extract the downloaded zip into your Tree of Savior `addons` folder (under *&lt;steam folder&gt;\steamapps\common\TreeOfSavior\addons*).
 4. If you're using Excrulon's addons, add the following line to `addonloader.lua` in the `[[ADDONS]]` section:
