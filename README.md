@@ -6,7 +6,7 @@ This is an add-on for the game Tree of Savior that revamps the collection window
 ## Features
  - Displays the collections as a list: no more cropped names.
  - Can optionally display unknown collections.
- - Displays the number of items in a collection, including how many could be added from the inventory.
+ - Displays the number of items in a collection, including how many can be added from the inventory.
  - Ability to filter complete, incomplete or unknown collections.
  - Can sort collections by game order, name, or status (collections with missing items present in the inventory are listed first).
  - Quickly find a collection by name using the search box.

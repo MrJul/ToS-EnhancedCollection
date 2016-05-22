@@ -1,4 +1,4 @@
--- Enhanced Collection v1.0.1 by MrJul
+-- Enhanced Collection v1.0.2 by MrJul
 -- https://github.com/MrJul/ToS-EnhancedCollection
 -- Licensed under Apache License v2.0
 
@@ -81,15 +81,24 @@ end
 
 -- Returns the number of inventory items that can be used to progress a given collection.
 local function GetUsefulItemsInventoryCount(collectionClass, collection, geCollection)
+
 	local usefulItemCount = 0;
+	local handledItemClasses = {}; -- avoid duplicates (eg in Demon Prison District 4 or Bellai Rainforest collections)
+
 	for i = 1, 9 do
 		local itemName = collectionClass["ItemName_" .. i];
 		if itemName == "None" then
 			break;
 		end
-		local itemInfo = GetItemInfo(GetClass("Item", itemName), collection, geCollection);
-		usefulItemCount = usefulItemCount + itemInfo.usefulInventoryCount;
+
+		local itemClass = GetClass("Item", itemName);
+		if handledItemClasses[itemClass.ClassID] ~= true then
+			handledItemClasses[itemClass.ClassID] = true;
+			local itemInfo = GetItemInfo(itemClass, collection, geCollection);
+			usefulItemCount = usefulItemCount + itemInfo.usefulInventoryCount;
+		end
 	end
+
 	return usefulItemCount;
 end
 
@@ -500,7 +509,7 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect
 	end
 
 	local y = 20;
-	local handledItemClasses = {}; -- avoid duplicates (appears in Bellai Rainforest collection)
+	local handledItemClasses = {}; -- avoid duplicates (eg in Demon Prison District 4 or Bellai Rainforest collections)
 
 	for i = 1, 9 do
 		local itemName = collectionClass["ItemName_" .. i];
@@ -732,4 +741,4 @@ SetupHook(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 
 Init();
 
-ui.SysMsg("Enhanced Collection v1.0.1 loaded!");
+ui.SysMsg("Enhanced Collection v1.0.2 loaded!");
