@@ -1,4 +1,4 @@
--- Enhanced Collection v1.0 by MrJul
+-- Enhanced Collection v1.0.1 by MrJul
 -- https://github.com/MrJul/ToS-EnhancedCollection
 -- Licensed under Apache License v2.0
 
@@ -461,7 +461,7 @@ local function CreateDetailItemControl(detailControl, itemClass, collectionClass
 	local nameControl = itemControl:CreateOrGetControl("richtext", "name", 64, 0, width - 64, height);
 	nameControl:SetGravity(ui.LEFT, ui.CENTER_VERT);
 	nameControl:EnableHitTest(0);
-	nameControl:SetText(GET_FULL_NAME(itemClass));
+	nameControl:SetText("{ol}" .. GET_FULL_NAME(itemClass));
 
 	local countControl = itemControl:CreateOrGetControl("richtext", "count", 0, 0, width, height);
 	local countString = MakeCountString(itemInfo);
@@ -732,4 +732,4 @@ SetupHook(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 
 Init();
 
-ui.SysMsg("Enhanced Collection v1.0 loaded!");
+ui.SysMsg("Enhanced Collection v1.0.1 loaded!");
