@@ -1,3 +1,7 @@
+-- Enhanced Collection v1.0 by MrJul
+-- https://github.com/MrJul/ToS-EnhancedCollection
+-- Licensed under Apache License v2.0
+
 local sortTypes = {
 	default = 0,
 	name = 1,
