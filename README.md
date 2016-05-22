@@ -43,6 +43,8 @@ dofile("../addons/showinvestedstatpoints/showinvestedstatpoints.lua");
 dofile("../addons/enhancedcollection/enhancedcollection.lua");
 ```
 
-## Support
+## Misc
 
 If you're encountering any problems while using the add-on, please [open an issue](https://github.com/MrJul/ToS-EnhancedCollection/issues)!
+
+If you're interested in collection management, you should probably also install [Xanaxiel's Tooltip Helper](https://github.com/Xanaxiel/ToS-Addons) if you haven't already!
