@@ -711,10 +711,20 @@ local function COLLECTION_FIRST_OPEN_HOOKED(frame)
 	UPDATE_COLLECTION_LIST(frame);
 end
 
-SETUP_HOOK(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
-SETUP_HOOK(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
-SETUP_HOOK(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
-SETUP_HOOK(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
+local function SetupHook(newFunction, hookedFunctionName)
+	local storeOldFunc = hookedFunctionName .. "_OLD";
+	if _G[storeOldFunc] == nil then
+		_G[storeOldFunc] = _G[hookedFunctionName];
+		_G[hookedFunctionName] = newFunction;
+	else
+		_G[hookedFunctionName] = newFunction;
+	end
+end
+
+SetupHook(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
+SetupHook(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
+SetupHook(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
+SetupHook(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
 
 Init();
 
