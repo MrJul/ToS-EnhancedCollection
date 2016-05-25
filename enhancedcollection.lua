@@ -434,6 +434,91 @@ local function GetDetailItemIconColorTone(itemInfo)
 	end
 end
 
+local function FindAppropriateInventoryItem(itemClassID)
+
+	-- GET_ONLY_PURE_INVITEMLIST returns the matching inventory items, sorted by "enhancement level" ascending.
+	local inventoryItemList = GET_ONLY_PURE_INVITEMLIST(itemClassID);
+	if inventoryItemList == nil then
+		return nil, nil;
+	end
+
+	local foundInventoryItem;
+	local foundInventoryItemIsLocked = true;
+
+	for i, inventoryItem in ipairs(inventoryItemList) do
+		foundInventoryItem = inventoryItem;
+		if not inventoryItem.isLockState then
+			foundInventoryItemIsLocked = false;
+			break;
+		end
+	end
+
+	if foundInventoryItem == nil then
+		return nil, nil;
+	end
+
+	return foundInventoryItem, foundInventoryItemIsLocked;
+
+end
+
+local function GetAddItemConfirmationMessage(itemID, itemClass)
+	local message = "The following item will be removed from your inventory to be added to your collection:{nl} {nl}";
+	message = message .. "{img " .. itemClass.Icon .. " 32 32} {ol}" .. GET_FULL_NAME(itemClass) .. "{/}{nl} {nl}";
+	if IS_VALUEABLE_ITEM(itemID) == 1 then
+		message = message .. "{#FF0000}WARNING:{nl}This item is enhanced or upgraded.{/}{nl} ";
+	end
+	message = message .. "{nl}Do you want to continue?";
+	return message;
+end
+
+local function AddItemToCollection(slot, getInventoryItemFunc)
+
+	local collectionClassID = slot:GetUserIValue("COLLECTION_TYPE");
+	local itemClassID = slot:GetUserIValue("ITEM_TYPE");
+	if collectionClassID == nil or itemClassID == nil then
+		return;
+	end
+
+	local collection = session.GetMySession():GetCollection():Get(collectionClassID);
+	local currentCount = collection ~= nil and collection:GetItemCountByType(itemClassID) or 0;
+	local neededCount = geCollectionTable.Get(collectionClassID):GetNeedItemCount(itemClassID);
+
+	if currentCount >= neededCount then
+		return;
+	end
+
+	local inventoryItem, isLocked = getInventoryItemFunc(itemClassID);
+	if inventoryItem == nil then
+		return
+	end
+
+	if isLocked then
+		ui.SysMsg(ClMsg("MaterialItemIsLock"));
+		return;
+	end
+
+	local itemID = inventoryItem:GetIESID();
+	local itemClass = GetIES(inventoryItem:GetObject());
+	local onOkClickedScript = string.format("EXEC_PUT_COLLECTION(\"%s\", %d)", itemID, collectionClassID);
+
+	imcSound.PlaySoundEvent("sys_popup_open_1");
+	ui.MsgBox(GetAddItemConfirmationMessage(itemID, itemClass), onOkClickedScript, "None");
+
+end
+
+local function GetCurrentDraggedInventoryItem()
+	return session.GetInvItemByGuid(ui.GetLiftIcon():GetInfo():GetIESID());
+end
+
+function ENHANCEDCOLLECTION_AUTOADDITEMFROMINVENTORY(parent, slot)
+	AddItemToCollection(slot, FindAppropriateInventoryItem);
+end
+
+function ENHANCEDCOLLECTION_ADDDROPPEDITEM(frame, slot)
+	AddItemToCollection(slot, GetCurrentDraggedInventoryItem);
+end
+
+
 -- Creates a new detail for an item contained in a given collection.
 local function CreateDetailItemControl(detailControl, itemClass, collectionClass, collection, geCollection, controlName, y)
 
@@ -448,19 +533,34 @@ local function CreateDetailItemControl(detailControl, itemClass, collectionClass
 	local isKnownCollection = collection ~= nil;
 	local canTake = isKnownCollection and itemInfo.currentCount > itemInfo.neededCount;
 	local canDrop = isKnownCollection and itemInfo.usefulInventoryCount > 0;
+	local isSlotEnabled = canTake or canDrop;
 
 	slot:SetGravity(ui.LEFT, ui.CENTER_VERT);
 	slot:SetSkinName("invenslot2");
 	slot:EnableDrag(0);
-	slot:EnableHitTest((canTake or canDrop) and 1 or 0);
-	slot:SetOverSound("button_cursor_over_2");
+	slot:EnableDrop(1);
+	slot:EnableHitTest(isSlotEnabled and 1 or 0);
+	slot:SetOverSound("button_cursor_over_3");
+	slot:SetClickSound("button_click_big_2");
 	slot:SetUserValue("COLLECTION_TYPE", collectionClass.ClassID);
-	slot:SetColorTone((canTake or canDrop) and "FFFFFFFF" or "00FFFFFF");
+	slot:SetUserValue("ITEM_TYPE", itemClass.ClassID);
+	slot:SetColorTone(isSlotEnabled and "FFFFFFFF" or "00FFFFFF");
+
 	if canTake then
-		slot:SetEventScript(ui.RBUTTONUP, "COLLECTION_TAKE2");
+		slot:SetEventScript(ui.RBUTTONUP, "COLLECTION_TAKE");
 	end
+
 	if canDrop then
-		slot:SetEventScript(ui.DROP, "COLLECTION_DROP");
+
+		slot:SetEventScript(ui.DROP, "ENHANCEDCOLLECTION_ADDDROPPEDITEM");
+		slot:SetEventScript(ui.LBUTTONUP, "ENHANCEDCOLLECTION_AUTOADDITEMFROMINVENTORY");
+		slot:SetClickSound("button_click_big_2");
+
+		local addItemPicture = tolua.cast(slot:CreateOrGetControl("picture", "additempicture", 0, 0, 48, 48), "ui::CPicture");
+		addItemPicture:EnableHitTest(0);
+		addItemPicture:SetImage("itemcraft_btn");
+		addItemPicture:SetEnableStretch(1);
+
 	end
 
 	local icon = CreateIcon(slot);
