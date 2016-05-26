@@ -847,10 +847,19 @@ local function SetupHook(newFunction, hookedFunctionName)
 	end
 end
 
+local function UI_TOGGLE_COLLECTION_HOOKED()
+	local collectionFrame = ui.GetFrame("collection");
+	local inventoryFrame = ui.GetFrame("inventory");
+	local showState = collectionFrame:IsVisible() == 1 and 0 or 1;
+	collectionFrame:ShowWindow(showState);
+	inventoryFrame:ShowWindow(showState);
+end
+
 SetupHook(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
 SetupHook(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
 SetupHook(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
 SetupHook(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
+SetupHook(UI_TOGGLE_COLLECTION_HOOKED, "UI_TOGGLE_COLLECTION");
 
 Init();
 
