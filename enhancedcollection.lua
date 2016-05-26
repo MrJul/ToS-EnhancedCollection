@@ -358,6 +358,10 @@ end
 -- Updates the full collection list.
 local function UPDATE_COLLECTION_LIST_HOOKED(frame, addType, removeType)
 
+	if frame:IsVisible() == 0 then
+		return;
+	end
+
 	local itemsBgGroup = frame:GetChild("itemsbggroup");
 	if itemsBgGroup == nil then
 		return;
@@ -414,13 +418,21 @@ end
 
 -- Updates the current selected collection detail.
 local function UPDATE_COLLECTION_DETAIL_HOOKED(frame)
-	local itemsContainer = GET_CHILD(frame, "itemscontainer", "ui::CGroupBox");
+
+	if frame:IsVisible() == 0 then
+		return;
+	end
+
+	local itemsBgGroup = GET_CHILD(frame, "itemsbggroup", "ui::CGroupBox");
+	local itemsContainer = itemsBgGroup ~= nil and GET_CHILD(itemsBgGroup, "itemscontainer", "ui::CGroupBox") or nil;
+
 	if itemsContainer ~= nil then
 		local currentDetailItemControl = GetCurrentDetailItemControl(frame, itemsContainer);
 		if currentDetailItemControl ~= nil then
 			EnsureCollectionItemDetailCreated(currentDetailItemControl, frame, 1);
 		end
 	end
+
 end
 
 -- Returns the color tone of an item's icon.
@@ -627,14 +639,6 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect
 	end
 	y = y + 10;
 
-	-- BUG: if a complete collection is open and the inventory changes, a sound is playing incorrectly.
-	-- This bug is also present in the original collection.lua code.
-	if shouldPlayEffect == 1 and isCollectionComplete then
-		local posX, posY = GET_SCREEN_XY(detailControl);
-		movie.PlayUIEffect("SYS_quest_mark", posX, posY, 1.0);
-		imcSound.PlaySoundEvent(frame:GetUserConfig("SOUND_COLLECTION"));
-	end
-
 	local abilityGroupControl = tolua.cast(detailControl:CreateOrGetControl("groupbox", "abilitygroup", 0, y, detailControl:GetWidth(), 30), "ui::CGroupBox");
 	abilityGroupControl:SetGravity(ui.LEFT, ui.TOP);
 	abilityGroupControl:EnableHitTest(0);
@@ -649,6 +653,15 @@ local function DETAIL_UPDATE_HOOKED(frame, detailControl, type, shouldPlayEffect
 	abilityTextControl:SetText("{ol}{" .. color .. "}" .. ClMsg("CollectionEffect") .. ": " .. GET_COLLECTION_EFFECT_DESC(type));
 
 	detailControl:Resize(detailControl:GetWidth(), y + 8);
+
+	-- BUG: if a complete collection is open and the inventory changes, a sound is playing incorrectly.
+	-- This bug is also present in the original collection.lua code.
+	if shouldPlayEffect == 1 and isCollectionComplete then
+		local posX, posY = GET_SCREEN_XY(abilityGroupControl);
+		movie.PlayUIEffect("SYS_quest_mark", posX, posY, 1.0);
+		imcSound.PlaySoundEvent(frame:GetUserConfig("SOUND_COLLECTION"));
+		UI_PLAYFORCE(abilityTextControl, "text_eft_1", 0, 0);
+	end
 
 end
 
