@@ -16,8 +16,8 @@ This is an add-on for the game Tree of Savior that revamps the collection window
 ## Installation
 
 1. Download the [latest release of Enhanced Collection](https://github.com/MrJul/ToS-EnhancedCollection/releases).
-2. Ensure the downloaded filename is correctly named `☕enhancedcollection.ipf` (the cup icon **must** be present).
-3. Copy `☕enhancedcollection.ipf` to your Tree of Savior `data` folder (under *&lt;steam folder&gt;\steamapps\common\TreeOfSavior\data*).
+2. Extract the `☕enhancedcollection.ipf` file from the downloaded zip file and copy it to your Tree of Savior `data` folder (under *&lt;steam folder&gt;\steamapps\common\TreeOfSavior\data*).
+3. Ensure the downloaded filename is correctly named `☕enhancedcollection.ipf` (the cup icon **must** be present for the addon to load).
 
 Starting with v1.1.0, Enhanced Collection is now distributed as an IPF file, for easier installation.  
 If you've previously installed this add-on when it wasn't an IPF file, delete the `enhancedcollection` folder from your `addons` folder and remove the corresponding line from the `addonloader.lua` file.
