@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<uiframe name="enhancedcollection" x="0" y="0" width="10" height="10">
+	<frame fasthide="true" layout_gravity="left top"/>
+    <input moveable="false" hittestframe="false"/>
+    <layer layerlevel="10"/>
+    <draw drawframe="false" drawtitlebarframe="false" drawtitlebar="false"/>
+    <option closebutton="false" hideable="false"/>
+    <controls/>
+</uiframe>

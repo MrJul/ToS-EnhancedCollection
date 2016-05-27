@@ -1,0 +1,4 @@
+The files in this folder are only used to build the final .ipf file to release.
+ - ipf.fy comes from https://github.com/TwoLaid/treeofsavior-tools and has been fixed to be compatible with Python 3.5.
+ - ipf_unpack.exe comes from https://github.com/r1emu/IPFUnpacker and has not been modified.
+ 

@@ -11,37 +11,20 @@ This is an add-on for the game Tree of Savior that revamps the collection window
  - Can sort collections by game order, name, or status (collections with missing items present in the inventory are listed first).
  - Quickly find a collection by name using the search box.
  - Clearly displays which items are inside the collection or can be added from the inventory.
+ - Items can be added to the inventory in one click, directly from the collection window.
  
-
 ## Installation
 
-1. Download and install either [Excrulon's Lua Mods](https://github.com/Excrulon/Tree-of-Savior-Lua-Mods) or [fiote's cwLibrary](https://github.com/fiote/treeofsavior-addons).
-2. Download the [latest release of Enhanced Collection](https://github.com/MrJul/ToS-EnhancedCollection/releases).
-3. Extract the downloaded zip into your Tree of Savior `addons` folder (under *&lt;steam folder&gt;\steamapps\common\TreeOfSavior\addons*).
-4. If you're using Excrulon's addons, add the following line to `addonloader.lua` under the `[[ADDONS]]` section:
+1. Download the [latest release of Enhanced Collection](https://github.com/MrJul/ToS-EnhancedCollection/releases).
+2. Ensure the downloaded filename is correctly named `☕enhancedcollection.ipf` (the cup icon **must** be present).
+3. Copy `☕enhancedcollection.ipf` to your Tree of Savior `data` folder (under *&lt;steam folder&gt;\steamapps\common\TreeOfSavior\data*).
 
-```lua
-dofile("../addons/enhancedcollection/enhancedcollection.lua");
-```
+Starting with v1.1.0, Enhanced Collection is now distributed as an IPF file, for easier installation.  
+If you've previously installed this add-on when it wasn't an IPF file, delete the `enhancedcollection` folder from your `addons` folder and remove the corresponding line from the `addonloader.lua` file.
 
-The final file should look like this:
+## Uninstallation
 
-```lua
---[[ADDONS]]
-dofile("../addons/betterquest/betterquest.lua");
-dofile("../addons/channelsurfer/channelsurfer.lua");
-dofile("../addons/contextmenuadditions/contextmenuadditions.lua");
-dofile("../addons/expcardcalculator/expcardcalculator.lua");
-dofile("../addons/expviewer/expviewer.lua");
-dofile("../addons/guildmates/guildmates.lua");
-dofile("../addons/hidemaxedattributes/hidemaxedattributes.lua");
-dofile("../addons/mapfogviewer/mapfogviewer.lua");
-dofile("../addons/monsterframes/monsterframes.lua");
-dofile("../addons/monstertracker/monstertracker.lua");
-dofile("../addons/showinvestedstatpoints/showinvestedstatpoints.lua");
--- add the following line:
-dofile("../addons/enhancedcollection/enhancedcollection.lua");
-```
+Delete `☕enhancedcollection.ipf` from your Tree of Savior `data` folder.
 
 ## Misc
 

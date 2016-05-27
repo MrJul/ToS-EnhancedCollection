@@ -1,4 +1,4 @@
--- Enhanced Collection v1.0.2 by MrJul
+-- Enhanced Collection v1.1.0 by MrJul
 -- https://github.com/MrJul/ToS-EnhancedCollection
 -- Licensed under Apache License v2.0
 
@@ -821,7 +821,7 @@ local function InitItemsControls(frame)
 
 end
 
-local function Init()
+local function InitFrame()
 	local frame = ui.GetFrame("collection");
 	InitFilters(frame);
 	InitSortButtons(frame);
@@ -833,7 +833,7 @@ end
 
 local function COLLECTION_FIRST_OPEN_HOOKED(frame)
 	GET_CHILD(frame, "showoption", "ui::CDropList"):ShowWindow(0);
-	Init();
+	InitFrame();
 	UPDATE_COLLECTION_LIST(frame);
 end
 
@@ -855,12 +855,15 @@ local function UI_TOGGLE_COLLECTION_HOOKED()
 	inventoryFrame:ShowWindow(showState);
 end
 
-SetupHook(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
-SetupHook(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
-SetupHook(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
-SetupHook(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
-SetupHook(UI_TOGGLE_COLLECTION_HOOKED, "UI_TOGGLE_COLLECTION");
+local function SetupHooks()
+	SetupHook(UPDATE_COLLECTION_LIST_HOOKED, "UPDATE_COLLECTION_LIST");
+	SetupHook(UPDATE_COLLECTION_DETAIL_HOOKED, "UPDATE_COLLECTION_DETAIL");
+	SetupHook(DETAIL_UPDATE_HOOKED, "DETAIL_UPDATE");
+	SetupHook(COLLECTION_FIRST_OPEN_HOOKED, "COLLECTION_FIRST_OPEN");
+	SetupHook(UI_TOGGLE_COLLECTION_HOOKED, "UI_TOGGLE_COLLECTION");
+end
 
-Init();
-
-ui.SysMsg("Enhanced Collection v1.0.2 loaded!");
+function ENHANCEDCOLLECTION_ON_INIT(addon, frame)
+	SetupHooks();
+	ui.SysMsg("Enhanced Collection v1.1.0 loaded!");
+end
