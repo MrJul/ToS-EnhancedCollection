@@ -7,7 +7,7 @@ if (Test-Path $outputDir) {
 	Remove-Item -Recurse -Force $outputDir
 }
 
-$ipfDir = "$outputDir\temp\addon_d.ipf\$outputDir";
+$ipfDir = "$outputDir\temp\addon_d.ipf\$name";
 Write-Output "Creating $ipfDir directory"
 New-Item -ItemType Directory -Force $ipfDir | Out-Null
 

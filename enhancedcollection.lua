@@ -1,6 +1,8 @@
--- Enhanced Collection v1.1.0 by MrJul
+-- Enhanced Collection v1.1.1 by MrJul
 -- https://github.com/MrJul/ToS-EnhancedCollection
 -- Licensed under Apache License v2.0
+
+local isLoaded = false;
 
 local sortTypes = {
 	default = 0,
@@ -475,7 +477,7 @@ end
 
 local function GetAddItemConfirmationMessage(itemID, itemClass)
 	local message = "The following item will be removed from your inventory to be added to your collection:{nl} {nl}";
-	message = message .. "{img " .. itemClass.Icon .. " 32 32} {ol}" .. GET_FULL_NAME(itemClass) .. "{/}{nl} {nl}";
+	message = message .. "{img " .. itemClass.Icon .. " 32 32} {ol}{#FFFFFF}" .. GET_FULL_NAME(itemClass) .. "{/}{/}{nl} {nl}";
 	if IS_VALUEABLE_ITEM(itemID) == 1 then
 		message = message .. "{#FF0000}WARNING:{nl}This item is enhanced or upgraded.{/}{nl} ";
 	end
@@ -864,6 +866,9 @@ local function SetupHooks()
 end
 
 function ENHANCEDCOLLECTION_ON_INIT(addon, frame)
-	SetupHooks();
-	ui.SysMsg("Enhanced Collection v1.1.0 loaded!");
+	if not isLoaded then
+		SetupHooks();
+		isLoaded = true;
+		ui.SysMsg("Enhanced Collection v1.1.1 loaded!");
+	end
 end
